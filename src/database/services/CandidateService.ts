@@ -30,6 +30,7 @@ export class CandidateService {
         return snapshot.docs.map(doc => ({
             id: doc.id,
             name: doc.data().name,
+            imageUri: doc.data().imageUri ?? null,
             createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         }));
     }
@@ -63,6 +64,7 @@ export class CandidateService {
         return {
             id: docSnap.id,
             name: docSnap.data().name,
+            imageUri: docSnap.data().imageUri ?? null,
             createdAt: docSnap.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
             values,
         };
@@ -85,13 +87,20 @@ export class CandidateService {
     static async create(
         userId: string,
         name: string,
-        values: Array<{ criterionId: string; value: number }>
+        values: Array<{ criterionId: string; value: number }>,
+        imageUri?: string | null
     ): Promise<string> {
         // Create candidate
-        const candidateRef = await addDoc(this.getCandidatesRef(userId), {
+        const candidatePayload: { name: string; createdAt: Timestamp; imageUri?: string | null } = {
             name,
             createdAt: Timestamp.now(),
-        });
+        };
+
+        if (imageUri) {
+            candidatePayload.imageUri = imageUri;
+        }
+
+        const candidateRef = await addDoc(this.getCandidatesRef(userId), candidatePayload);
 
         // Create values
         const valuePromises = values.map(v =>
@@ -111,11 +120,12 @@ export class CandidateService {
         userId: string,
         id: string,
         name: string,
-        values: Array<{ criterionId: string; value: number }>
+        values: Array<{ criterionId: string; value: number }>,
+        imageUri?: string | null
     ): Promise<void> {
         // Update candidate name
         const candidateRef = doc(this.getCandidatesRef(userId), id);
-        await updateDoc(candidateRef, { name });
+        await updateDoc(candidateRef, { name, imageUri: imageUri ?? null });
 
         // Delete old values
         const oldValuesQuery = query(

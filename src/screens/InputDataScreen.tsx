@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     SafeAreaView,
     Alert,
+    Image,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
@@ -92,9 +93,13 @@ export default function InputDataScreen({ navigation }: any) {
     const renderCandidate = ({ item }: { item: Candidate }) => (
         <View style={styles.candidateCard}>
             <View style={styles.candidateContent}>
-                <View style={styles.iconContainer}>
-                    <FontAwesome5 name="user" size={24} color={colors.primary} />
-                </View>
+                {item.imageUri ? (
+                    <Image source={{ uri: item.imageUri }} style={styles.candidateAvatar} />
+                ) : (
+                    <View style={styles.iconContainer}>
+                        <FontAwesome5 name="user" size={24} color={colors.primary} />
+                    </View>
+                )}
                 <View style={styles.candidateInfo}>
                     <Text style={styles.candidateName}>{item.name}</Text>
                     <Text style={styles.candidateDate}>
@@ -314,6 +319,13 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primary + '20',
         justifyContent: 'center',
         alignItems: 'center',
+        marginRight: spacing.md,
+    },
+
+    candidateAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         marginRight: spacing.md,
     },
 

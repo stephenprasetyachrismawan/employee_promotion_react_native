@@ -22,6 +22,7 @@ export interface Weight {
 export interface Candidate {
     id: string; // Changed from number to string for Firestore
     name: string;
+    imageUri?: string | null;
     createdAt: string;
 }
 
