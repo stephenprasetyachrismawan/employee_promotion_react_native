@@ -1,4 +1,4 @@
-import { Criterion, CandidateWithValues, WPMResult } from '../types';
+import { Criterion, CandidateWithValues, DecisionResult } from '../types';
 
 /**
  * Weighted Product Method (WPM) Calculator
@@ -21,7 +21,7 @@ export class WPMCalculator {
     static calculate(
         candidates: CandidateWithValues[],
         criteria: Criterion[]
-    ): WPMResult[] {
+    ): DecisionResult[] {
         if (candidates.length === 0 || criteria.length === 0) {
             return [];
         }
@@ -31,7 +31,7 @@ export class WPMCalculator {
             criteria.map(c => [c.id, (c.weight ?? 0) / 100])
         ); // Convert to decimal
 
-        const results: WPMResult[] = [];
+        const results: DecisionResult[] = [];
 
         for (const candidate of candidates) {
             let score = 1; // Start with 1 for multiplication
@@ -95,7 +95,7 @@ export class WPMCalculator {
      * Normalize scores to percentage (0-100%)
      * Based on the highest score being 100%
      */
-    static normalizeToPercentage(results: WPMResult[]): WPMResult[] {
+    static normalizeToPercentage(results: DecisionResult[]): DecisionResult[] {
         if (results.length === 0) {
             return [];
         }
@@ -118,7 +118,7 @@ export class WPMCalculator {
     static calculateNormalized(
         candidates: CandidateWithValues[],
         criteria: Criterion[]
-    ): WPMResult[] {
+    ): DecisionResult[] {
         const results = this.calculate(candidates, criteria);
         return this.normalizeToPercentage(results);
     }

@@ -89,6 +89,63 @@ export default function InputDataScreen({ navigation }: any) {
         );
     };
 
+    const handleDeleteGroup = (id: string, name: string) => {
+        if (!user) return;
+
+        Alert.alert(
+            'Delete Input Group',
+            `Hapus grup "${name}" beserta semua data di dalamnya?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await CriteriaGroupService.delete(user.uid, id);
+                            if (selectedGroup?.id === id) {
+                                setSelectedGroup(null);
+                            }
+                            loadData();
+                        } catch (error) {
+                            console.error('Error deleting group:', error);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleDuplicateGroup = (id: string, name: string) => {
+        if (!user) return;
+
+        Alert.alert(
+            'Duplicate Input Group',
+            `Duplikat grup "${name}" beserta kriteria?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Duplicate',
+                    onPress: async () => {
+                        try {
+                            const newGroupId = await CriteriaGroupService.duplicate(user.uid, id);
+                            await loadData();
+                            const newGroup = await CriteriaGroupService.getById(user.uid, newGroupId);
+                            if (newGroup) {
+                                setSelectedGroup(newGroup);
+                            }
+                        } catch (error) {
+                            console.error('Error duplicating group:', error);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const methodBadgeStyle = (method: string) =>
+        method === 'SAW' ? styles.methodBadgeSaw : styles.methodBadgeWpm;
+
     const handleDownloadTemplate = async () => {
         if (!user) return;
         try {
@@ -156,7 +213,16 @@ export default function InputDataScreen({ navigation }: any) {
             </View>
 
             <View style={styles.groupSection}>
-                <Text style={styles.sectionLabel}>Pilih Kelompok Kriteria</Text>
+                <View style={styles.groupHeader}>
+                    <Text style={styles.sectionLabel}>Kelompok Input</Text>
+                    <TouchableOpacity
+                        style={styles.addGroupButton}
+                        onPress={() => navigation.navigate('CriteriaGroupForm', { mode: 'add' })}
+                    >
+                        <FontAwesome5 name="plus" size={12} color={colors.primary} />
+                        <Text style={styles.addGroupText}>Tambah Grup</Text>
+                    </TouchableOpacity>
+                </View>
                 {groups.length === 0 ? (
                     <View style={styles.emptyGroupCard}>
                         <Text style={styles.emptyGroupText}>
@@ -173,36 +239,79 @@ export default function InputDataScreen({ navigation }: any) {
                         renderItem={({ item }) => {
                             const isActive = selectedGroup?.id === item.id;
                             return (
-                                <TouchableOpacity
+                                <View
                                     style={[
                                         styles.groupCard,
                                         isActive && styles.groupCardActive,
                                     ]}
-                                    onPress={() => {
-                                        setSelectedGroup(item);
-                                        setLoading(true);
-                                        CandidateService.getAllByGroup(user.uid, item.id)
-                                            .then(setCandidates)
-                                            .catch((error) =>
-                                                console.error('Error loading candidates:', error)
-                                            )
-                                            .finally(() => setLoading(false));
-                                        CriteriaService.countByGroup(user.uid, item.id)
-                                            .then(setCriteriaCount)
-                                            .catch((error) =>
-                                                console.error('Error loading criteria count:', error)
-                                            );
-                                    }}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.groupCardTitle,
-                                            isActive && styles.groupCardTitleActive,
-                                        ]}
+                                    <TouchableOpacity
+                                        style={styles.groupCardHeader}
+                                        onPress={() => {
+                                            setSelectedGroup(item);
+                                            setLoading(true);
+                                            CandidateService.getAllByGroup(user.uid, item.id)
+                                                .then(setCandidates)
+                                                .catch((error) =>
+                                                    console.error('Error loading candidates:', error)
+                                                )
+                                                .finally(() => setLoading(false));
+                                            CriteriaService.countByGroup(user.uid, item.id)
+                                                .then(setCriteriaCount)
+                                                .catch((error) =>
+                                                    console.error(
+                                                        'Error loading criteria count:',
+                                                        error
+                                                    )
+                                                );
+                                        }}
                                     >
-                                        {item.name}
-                                    </Text>
-                                </TouchableOpacity>
+                                        <Text
+                                            style={[
+                                                styles.groupCardTitle,
+                                                isActive && styles.groupCardTitleActive,
+                                            ]}
+                                        >
+                                            {item.name}
+                                        </Text>
+                                        <View style={[styles.methodBadge, methodBadgeStyle(item.method)]}>
+                                            <Text style={styles.methodBadgeText}>{item.method}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                    <View style={styles.groupActions}>
+                                        <TouchableOpacity
+                                            style={styles.groupActionButton}
+                                            onPress={() =>
+                                                navigation.navigate('CriteriaGroupForm', {
+                                                    groupId: item.id,
+                                                    mode: 'edit',
+                                                })
+                                            }
+                                        >
+                                            <FontAwesome5
+                                                name="edit"
+                                                size={16}
+                                                color={colors.textSecondary}
+                                            />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.groupActionButton}
+                                            onPress={() => handleDuplicateGroup(item.id, item.name)}
+                                        >
+                                            <FontAwesome5
+                                                name="copy"
+                                                size={16}
+                                                color={colors.textSecondary}
+                                            />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.groupActionButton}
+                                            onPress={() => handleDeleteGroup(item.id, item.name)}
+                                        >
+                                            <FontAwesome5 name="trash" size={16} color={colors.error} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
                             );
                         }}
                     />
@@ -253,9 +362,30 @@ export default function InputDataScreen({ navigation }: any) {
             </View>
 
             <View style={styles.listHeader}>
-                <Text style={styles.listTitle}>
-                    {selectedGroup ? `${selectedGroup.name} • ` : ''}Candidates ({candidates.length})
-                </Text>
+                <View style={styles.listHeaderContent}>
+                    <Text style={styles.listTitle}>
+                        {selectedGroup ? `${selectedGroup.name} • ` : ''}Candidates ({candidates.length})
+                    </Text>
+                    {selectedGroup ? (
+                        <View
+                            style={[
+                                styles.methodBadge,
+                                methodBadgeStyle(selectedGroup.method),
+                            ]}
+                        >
+                            <Text style={styles.methodBadgeText}>
+                                {selectedGroup.method}
+                            </Text>
+                        </View>
+                    ) : null}
+                </View>
+                {selectedGroup ? (
+                    <Text style={styles.methodHintText}>
+                        {selectedGroup.method === 'WPM'
+                            ? 'WPM: nilai input harus lebih dari 0.'
+                            : 'SAW: nilai dinormalisasi (benefit/max, cost/min).'}
+                    </Text>
+                ) : null}
             </View>
 
             {selectedGroup && criteriaCount === 0 ? (
@@ -319,7 +449,31 @@ const styles = StyleSheet.create({
         fontSize: typography.sm,
         fontWeight: typography.semibold,
         color: colors.textSecondary,
+    },
+
+    groupHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: spacing.sm,
+    },
+
+    addGroupButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.primary,
+        backgroundColor: colors.primary + '10',
+    },
+
+    addGroupText: {
+        fontSize: typography.xs,
+        color: colors.primary,
+        fontWeight: typography.semibold,
     },
 
     groupList: {
@@ -334,6 +488,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
+        minWidth: 180,
     },
 
     groupCardActive: {
@@ -341,15 +496,33 @@ const styles = StyleSheet.create({
         borderColor: colors.primary,
     },
 
+    groupCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: spacing.sm,
+    },
+
     groupCardTitle: {
         fontSize: typography.sm,
         color: colors.textSecondary,
         fontWeight: typography.medium,
+        flex: 1,
+        marginRight: spacing.sm,
     },
 
     groupCardTitleActive: {
         color: colors.primary,
         fontWeight: typography.semibold,
+    },
+
+    groupActions: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+
+    groupActionButton: {
+        padding: spacing.xs,
     },
 
     emptyGroupCard: {
@@ -419,10 +592,43 @@ const styles = StyleSheet.create({
         borderBottomColor: colors.border,
     },
 
+    listHeaderContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+    },
+
     listTitle: {
         fontSize: typography.lg,
         fontWeight: typography.semibold,
         color: colors.textPrimary,
+    },
+
+    methodBadge: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.full,
+    },
+
+    methodBadgeWpm: {
+        backgroundColor: colors.primary + '20',
+    },
+
+    methodBadgeSaw: {
+        backgroundColor: colors.benefit + '20',
+    },
+
+    methodBadgeText: {
+        fontSize: typography.xs,
+        fontWeight: typography.semibold,
+        color: colors.textPrimary,
+    },
+
+    methodHintText: {
+        marginTop: spacing.xs,
+        fontSize: typography.xs,
+        color: colors.textSecondary,
     },
 
     list: {

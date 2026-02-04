@@ -12,7 +12,7 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { CriteriaGroup } from '../../types';
+import { CriteriaGroup, DecisionMethod } from '../../types';
 import { CriteriaService } from './CriteriaService';
 
 export class CriteriaGroupService {
@@ -40,6 +40,7 @@ export class CriteriaGroupService {
             id: doc.id,
             name: doc.data().name,
             description: doc.data().description ?? null,
+            method: (doc.data().method as DecisionMethod) ?? 'WPM',
             createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         }));
     }
@@ -56,14 +57,21 @@ export class CriteriaGroupService {
             id: docSnap.id,
             name: docSnap.data().name,
             description: docSnap.data().description ?? null,
+            method: (docSnap.data().method as DecisionMethod) ?? 'WPM',
             createdAt: docSnap.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         };
     }
 
-    static async create(userId: string, name: string, description?: string): Promise<string> {
+    static async create(
+        userId: string,
+        name: string,
+        description?: string,
+        method: DecisionMethod = 'WPM'
+    ): Promise<string> {
         const docRef = await addDoc(this.getCollectionRef(userId), {
             name,
             description: description ?? null,
+            method,
             createdAt: Timestamp.now(),
         });
 
@@ -74,12 +82,14 @@ export class CriteriaGroupService {
         userId: string,
         id: string,
         name: string,
-        description?: string
+        description?: string,
+        method: DecisionMethod = 'WPM'
     ): Promise<void> {
         const docRef = doc(this.getCollectionRef(userId), id);
         await updateDoc(docRef, {
             name,
             description: description ?? null,
+            method,
         });
     }
 
@@ -121,7 +131,8 @@ export class CriteriaGroupService {
         const newGroupId = await this.create(
             userId,
             `${group.name} (Copy)`,
-            group.description ?? undefined
+            group.description ?? undefined,
+            group.method ?? 'WPM'
         );
 
         await Promise.all(

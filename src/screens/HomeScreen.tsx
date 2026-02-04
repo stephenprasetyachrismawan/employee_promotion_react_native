@@ -138,7 +138,7 @@ export default function HomeScreen({ navigation }: any) {
                 <Card style={styles.analyzeCard} variant="elevated">
                     <Text style={styles.analyzeTitle}>Ready to Analyze?</Text>
                     <Text style={styles.analyzeSubtitle}>
-                        Calculate scores using Weighted Product Method.
+                        Jalankan Decision Support System dengan metode WPM atau SAW.
                     </Text>
                     <Button
                         title="View Results"
