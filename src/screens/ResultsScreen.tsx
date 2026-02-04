@@ -53,13 +53,12 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
             ]}
             onPress={onToggle}
         >
+            <View style={styles.rankBadge}>
+                <Text style={[styles.rankNumber, { color: getRankColor(result.rank) }]}>
+                    {result.rank}
+                </Text>
+            </View>
             <View style={styles.resultHeader}>
-                <View style={styles.rankBadge}>
-                    <Text style={[styles.rankNumber, { color: getRankColor(result.rank) }]}>
-                        {result.rank}
-                    </Text>
-                </View>
-
                 {result.imageUri ? (
                     <Image source={{ uri: result.imageUri }} style={styles.candidateAvatar} />
                 ) : (
@@ -422,6 +421,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         marginBottom: spacing.md,
+        position: 'relative',
         ...shadows.md,
     },
 
@@ -438,16 +438,20 @@ const styles = StyleSheet.create({
     },
 
     rankBadge: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        position: 'absolute',
+        top: spacing.sm,
+        right: spacing.sm,
+        minWidth: 24,
+        height: 24,
+        paddingHorizontal: spacing.xs,
+        borderRadius: borderRadius.full,
         backgroundColor: colors.dark.surface,
         justifyContent: 'center',
         alignItems: 'center',
     },
 
     rankNumber: {
-        fontSize: typography.lg,
+        fontSize: typography.sm,
         fontWeight: typography.bold,
     },
 
