@@ -17,6 +17,7 @@ import { Button } from '../components/common/Button';
 import { ScaleSlider } from '../components/common/ScaleSlider';
 import { Criterion } from '../types';
 import { CriteriaService } from '../database/services/CriteriaService';
+import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CandidateService } from '../database/services/CandidateService';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -29,12 +30,14 @@ export default function ManualEntryScreen({ route, navigation }: any) {
     const [name, setName] = useState('');
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [criteria, setCriteria] = useState<Criterion[]>([]);
-    const [values, setValues] = useState<{ [key: string]: number }>({});
+    const [values, setValues] = useState<{ [key: string]: number | undefined }>({});
+    const [method, setMethod] = useState<'WPM' | 'SAW'>('WPM');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (groupId) {
             loadCriteria(groupId);
+            loadGroupMeta(groupId);
         }
     }, [groupId]);
 
@@ -51,13 +54,23 @@ export default function ManualEntryScreen({ route, navigation }: any) {
             setCriteria(data);
 
             // Initialize values with defaults
-            const initialValues: { [key: string]: number } = {};
+            const initialValues: { [key: string]: number | undefined } = {};
             data.forEach((criterion) => {
-                initialValues[criterion.id] = criterion.dataType === 'SCALE' ? 3 : 0;
+                initialValues[criterion.id] = criterion.dataType === 'SCALE' ? 3 : undefined;
             });
             setValues(initialValues);
         } catch (error) {
             console.error('Error loading criteria:', error);
+        }
+    };
+
+    const loadGroupMeta = async (activeGroupId: string) => {
+        if (!user) return;
+        try {
+            const group = await CriteriaGroupService.getById(user.uid, activeGroupId);
+            setMethod(group?.method ?? 'WPM');
+        } catch (error) {
+            console.error('Error loading group meta:', error);
         }
     };
 
@@ -94,8 +107,14 @@ export default function ManualEntryScreen({ route, navigation }: any) {
 
         // Validate all values are filled
         for (const criterion of criteria) {
-            if (values[criterion.id] === undefined || values[criterion.id] === 0) {
-                Alert.alert('Error', `Please enter a value for ${criterion.name}`);
+            const value = values[criterion.id];
+            if (value === undefined || (method === 'WPM' && value <= 0)) {
+                Alert.alert(
+                    'Error',
+                    method === 'WPM'
+                        ? `Nilai untuk ${criterion.name} harus lebih dari 0 (WPM).`
+                        : `Please enter a value for ${criterion.name}`
+                );
                 return;
             }
         }
@@ -104,7 +123,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
         try {
             const valuesList = criteria.map((c) => ({
                 criterionId: c.id,
-                value: values[c.id],
+                value: values[c.id] ?? 0,
             }));
 
             if (isEditMode) {
@@ -135,7 +154,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
         }
     };
 
-    const handleValueChange = (criterionId: string, value: number) => {
+    const handleValueChange = (criterionId: string, value: number | undefined) => {
         setValues((prev) => ({ ...prev, [criterionId]: value }));
     };
 
@@ -210,7 +229,9 @@ export default function ManualEntryScreen({ route, navigation }: any) {
 
                     <Text style={styles.sectionTitle}>Criterion Values</Text>
                     <Text style={styles.sectionSubtitle}>
-                        Enter values for each criterion
+                        {method === 'WPM'
+                            ? 'WPM: nilai harus lebih dari 0 untuk semua kriteria.'
+                            : 'SAW: nilai akan dinormalisasi per kriteria.'}
                     </Text>
 
                     {criteria.map((criterion) => (
@@ -230,10 +251,18 @@ export default function ManualEntryScreen({ route, navigation }: any) {
                                     placeholder="Enter value"
                                     placeholderTextColor={colors.textTertiary}
                                     keyboardType="numeric"
-                                    value={values[criterion.id]?.toString() || ''}
+                                    value={
+                                        values[criterion.id] !== undefined
+                                            ? values[criterion.id]?.toString()
+                                            : ''
+                                    }
                                     onChangeText={(text) => {
-                                        const numValue = parseFloat(text) || 0;
-                                        handleValueChange(criterion.id, numValue);
+                                        if (text.trim() === '') {
+                                            handleValueChange(criterion.id, undefined);
+                                            return;
+                                        }
+                                        const numValue = parseFloat(text);
+                                        handleValueChange(criterion.id, Number.isNaN(numValue) ? 0 : numValue);
                                     }}
                                 />
                             ) : (

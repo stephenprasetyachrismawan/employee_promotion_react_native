@@ -1,6 +1,7 @@
 // Data types
 export type DataType = 'NUMERIC' | 'SCALE';
 export type ImpactType = 'BENEFIT' | 'COST';
+export type DecisionMethod = 'WPM' | 'SAW';
 
 // Criterion model
 export interface Criterion {
@@ -18,6 +19,7 @@ export interface CriteriaGroup {
     id: string;
     name: string;
     description?: string | null;
+    method: DecisionMethod;
     createdAt: string;
 }
 
@@ -42,8 +44,8 @@ export interface CandidateWithValues extends Candidate {
     values: CandidateValue[];
 }
 
-// WPM Result
-export interface WPMResult {
+// Decision Support System Result
+export interface DecisionResult {
     candidateId: string;
     candidateName: string;
     imageUri?: string | null;

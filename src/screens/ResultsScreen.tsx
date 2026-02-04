@@ -10,15 +10,16 @@ import {
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
-import { Criterion, CriteriaGroup, WPMResult } from '../types';
+import { Criterion, CriteriaGroup, DecisionResult } from '../types';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CandidateService } from '../database/services/CandidateService';
 import { WPMCalculator } from '../utils/wpm';
+import { SAWCalculator } from '../utils/saw';
 import { useAuth } from '../contexts/AuthContext';
 
 interface CandidateResultCardProps {
-    result: WPMResult;
+    result: DecisionResult;
     criteria: Criterion[];
     onToggle: () => void;
     isExpanded: boolean;
@@ -27,7 +28,7 @@ interface CandidateResultCardProps {
 interface GroupResults {
     group: CriteriaGroup;
     criteria: Criterion[];
-    results: WPMResult[];
+    results: DecisionResult[];
     status: 'ready' | 'missingCriteria' | 'missingCandidates' | 'invalidWeights';
 }
 
@@ -178,10 +179,10 @@ export default function ResultsScreen({ navigation }: any) {
                         };
                     }
 
-                    const calculatedResults = WPMCalculator.calculateNormalized(
-                        candidatesData,
-                        criteriaData
-                    );
+                    const calculatedResults =
+                        group.method === 'SAW'
+                            ? SAWCalculator.calculateNormalized(candidatesData, criteriaData)
+                            : WPMCalculator.calculateNormalized(candidatesData, criteriaData);
 
                     return {
                         group,
@@ -209,8 +210,10 @@ export default function ResultsScreen({ navigation }: any) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Analysis Results</Text>
-                    <Text style={styles.subtitle}>Weighted Product Method Ranking.</Text>
+                    <Text style={styles.title}>Decision Support System Results</Text>
+                    <Text style={styles.subtitle}>
+                        Rangking berbasis metode grup (WPM atau SAW).
+                    </Text>
                 </View>
                 <View style={styles.emptyState}>
                     <FontAwesome5 name="exclamation-circle" size={64} color={colors.textTertiary} />
@@ -227,8 +230,10 @@ export default function ResultsScreen({ navigation }: any) {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Analysis Results</Text>
-                <Text style={styles.subtitle}>Weighted Product Method Ranking.</Text>
+                <Text style={styles.title}>Decision Support System Results</Text>
+                <Text style={styles.subtitle}>
+                    Rangking berbasis metode grup (WPM atau SAW).
+                </Text>
             </View>
 
             {loading ? (
@@ -246,20 +251,34 @@ export default function ResultsScreen({ navigation }: any) {
                                         {groupResult.criteria.length} criteria
                                     </Text>
                                 </View>
-                                <View style={styles.groupStatus}>
-                                    <FontAwesome5
-                                        name={
-                                            groupResult.status === 'ready'
-                                                ? 'check-circle'
-                                                : 'exclamation-circle'
-                                        }
-                                        size={18}
-                                        color={
-                                            groupResult.status === 'ready'
-                                                ? colors.success
-                                                : colors.warning
-                                        }
-                                    />
+                                <View style={styles.groupMetaRight}>
+                                    <View
+                                        style={[
+                                            styles.methodBadge,
+                                            groupResult.group.method === 'SAW'
+                                                ? styles.methodBadgeSaw
+                                                : styles.methodBadgeWpm,
+                                        ]}
+                                    >
+                                        <Text style={styles.methodBadgeText}>
+                                            {groupResult.group.method}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.groupStatus}>
+                                        <FontAwesome5
+                                            name={
+                                                groupResult.status === 'ready'
+                                                    ? 'check-circle'
+                                                    : 'exclamation-circle'
+                                            }
+                                            size={18}
+                                            color={
+                                                groupResult.status === 'ready'
+                                                    ? colors.success
+                                                    : colors.warning
+                                            }
+                                        />
+                                    </View>
                                 </View>
                             </View>
 
@@ -340,6 +359,12 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
 
+    groupMetaRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
+
     groupTitle: {
         fontSize: typography.lg,
         fontWeight: typography.semibold,
@@ -359,6 +384,26 @@ const styles = StyleSheet.create({
         backgroundColor: colors.background,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+
+    methodBadge: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.full,
+    },
+
+    methodBadgeWpm: {
+        backgroundColor: colors.primary + '20',
+    },
+
+    methodBadgeSaw: {
+        backgroundColor: colors.benefit + '20',
+    },
+
+    methodBadgeText: {
+        fontSize: typography.xs,
+        fontWeight: typography.semibold,
+        color: colors.textPrimary,
     },
 
     groupMessage: {

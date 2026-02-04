@@ -120,7 +120,17 @@ export default function CriteriaListScreen({ navigation }: any) {
                         <FontAwesome5 name="layer-group" size={24} color={colors.primary} />
                     </View>
                     <View style={styles.groupInfo}>
-                        <Text style={styles.groupName}>{item.name}</Text>
+                        <View style={styles.groupTitleRow}>
+                            <Text style={styles.groupName}>{item.name}</Text>
+                            <View
+                                style={[
+                                    styles.methodBadge,
+                                    item.method === 'SAW' ? styles.methodBadgeSaw : styles.methodBadgeWpm,
+                                ]}
+                            >
+                                <Text style={styles.methodBadgeText}>{item.method}</Text>
+                            </View>
+                        </View>
                         <Text style={styles.groupMeta}>
                             {count} {count === 1 ? 'criterion' : 'criteria'}
                         </Text>
@@ -248,16 +258,43 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
+    groupTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        flexWrap: 'wrap',
+    },
+
     groupName: {
         fontSize: typography.base,
         fontWeight: typography.semibold,
         color: colors.textPrimary,
-        marginBottom: spacing.xs,
+    },
+
+    methodBadge: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.full,
+    },
+
+    methodBadgeWpm: {
+        backgroundColor: colors.primary + '20',
+    },
+
+    methodBadgeSaw: {
+        backgroundColor: colors.benefit + '20',
+    },
+
+    methodBadgeText: {
+        fontSize: typography.xs,
+        fontWeight: typography.semibold,
+        color: colors.textPrimary,
     },
 
     groupMeta: {
         fontSize: typography.sm,
         color: colors.textSecondary,
+        marginTop: spacing.xs,
     },
 
     actions: {
