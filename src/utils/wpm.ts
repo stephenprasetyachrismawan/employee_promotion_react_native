@@ -71,6 +71,7 @@ export class WPMCalculator {
             results.push({
                 candidateId: candidate.id,
                 candidateName: candidate.name,
+                imageUri: candidate.imageUri ?? null,
                 score,
                 rank: 0, // Will be set after sorting
                 values: Object.fromEntries(

@@ -6,6 +6,7 @@ import {
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
+    Image,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
@@ -57,6 +58,14 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
                         {result.rank}
                     </Text>
                 </View>
+
+                {result.imageUri ? (
+                    <Image source={{ uri: result.imageUri }} style={styles.candidateAvatar} />
+                ) : (
+                    <View style={styles.candidateAvatarPlaceholder}>
+                        <FontAwesome5 name="user" size={18} color={colors.textSecondary} />
+                    </View>
+                )}
 
                 <View style={styles.candidateInfo}>
                     <Text style={styles.candidateName}>{result.candidateName}</Text>
@@ -399,6 +408,21 @@ const styles = StyleSheet.create({
 
     candidateInfo: {
         flex: 1,
+    },
+
+    candidateAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+    },
+
+    candidateAvatarPlaceholder: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.background,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 
     candidateName: {
