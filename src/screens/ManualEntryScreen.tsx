@@ -9,7 +9,9 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
+    Image,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { colors, typography, spacing, borderRadius } from '../styles/theme';
 import { Button } from '../components/common/Button';
 import { ScaleSlider } from '../components/common/ScaleSlider';
@@ -24,6 +26,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
     const { user } = useAuth();
 
     const [name, setName] = useState('');
+    const [imageUri, setImageUri] = useState<string | null>(null);
     const [criteria, setCriteria] = useState<Criterion[]>([]);
     const [values, setValues] = useState<{ [key: string]: number }>({});
     const [loading, setLoading] = useState(false);
@@ -61,6 +64,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
             const candidate = await CandidateService.getWithValues(user.uid, candidateId);
             if (candidate) {
                 setName(candidate.name);
+                setImageUri(candidate.imageUri ?? null);
 
                 const candidateValues: { [key: string]: number } = {};
                 candidate.values.forEach((v) => {
@@ -96,9 +100,9 @@ export default function ManualEntryScreen({ route, navigation }: any) {
             }));
 
             if (isEditMode) {
-                await CandidateService.update(user.uid, candidateId, name.trim(), valuesList);
+                await CandidateService.update(user.uid, candidateId, name.trim(), valuesList, imageUri);
             } else {
-                await CandidateService.create(user.uid, name.trim(), valuesList);
+                await CandidateService.create(user.uid, name.trim(), valuesList, imageUri);
             }
 
             navigation.goBack();
@@ -112,6 +116,28 @@ export default function ManualEntryScreen({ route, navigation }: any) {
 
     const handleValueChange = (criterionId: string, value: number) => {
         setValues((prev) => ({ ...prev, [criterionId]: value }));
+    };
+
+    const handleSelectImage = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: 'image/*',
+                copyToCacheDirectory: true,
+                multiple: false,
+            });
+
+            if (result.canceled) {
+                return;
+            }
+
+            const asset = result.assets?.[0];
+            if (asset?.uri) {
+                setImageUri(asset.uri);
+            }
+        } catch (error) {
+            console.error('Error selecting image:', error);
+            Alert.alert('Error', 'Failed to select image');
+        }
     };
 
     return (
@@ -133,6 +159,33 @@ export default function ManualEntryScreen({ route, navigation }: any) {
                         value={name}
                         onChangeText={setName}
                     />
+
+                    <Text style={styles.sectionTitle}>Candidate Photo</Text>
+                    <View style={styles.photoCard}>
+                        {imageUri ? (
+                            <Image source={{ uri: imageUri }} style={styles.photoPreview} />
+                        ) : (
+                            <View style={styles.photoPlaceholder}>
+                                <Text style={styles.photoPlaceholderText}>
+                                    No photo selected
+                                </Text>
+                            </View>
+                        )}
+                        <View style={styles.photoActions}>
+                            <Button
+                                title={imageUri ? 'Change Photo' : 'Select Photo'}
+                                onPress={handleSelectImage}
+                                variant="outline"
+                            />
+                            {imageUri ? (
+                                <Button
+                                    title="Remove Photo"
+                                    onPress={() => setImageUri(null)}
+                                    variant="secondary"
+                                />
+                            ) : null}
+                        </View>
+                    </View>
 
                     <Text style={styles.sectionTitle}>Criterion Values</Text>
                     <Text style={styles.sectionSubtitle}>
@@ -239,6 +292,42 @@ const styles = StyleSheet.create({
         color: colors.textPrimary,
         borderWidth: 1,
         borderColor: colors.border,
+    },
+
+    photoCard: {
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: spacing.md,
+    },
+
+    photoPreview: {
+        width: '100%',
+        height: 200,
+        borderRadius: borderRadius.md,
+        resizeMode: 'cover',
+    },
+
+    photoPlaceholder: {
+        height: 200,
+        borderRadius: borderRadius.md,
+        backgroundColor: colors.background,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderStyle: 'dashed',
+    },
+
+    photoPlaceholderText: {
+        fontSize: typography.sm,
+        color: colors.textTertiary,
+    },
+
+    photoActions: {
+        gap: spacing.sm,
     },
 
     criterionSection: {
