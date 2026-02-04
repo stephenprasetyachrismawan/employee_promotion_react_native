@@ -16,8 +16,7 @@ import { CriteriaGroupService } from '../database/services/CriteriaGroupService'
 import { useAuth } from '../contexts/AuthContext';
 
 export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
-    const { groupId: routeGroupId, group } = route.params || {};
-    const groupId = routeGroupId ?? group?.id ?? '';
+    const { groupId } = route.params || {};
     const { user } = useAuth();
     const [criteria, setCriteria] = useState<Criterion[]>([]);
     const [group, setGroup] = useState<CriteriaGroup | null>(null);

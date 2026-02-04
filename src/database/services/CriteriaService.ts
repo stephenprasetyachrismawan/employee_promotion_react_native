@@ -35,6 +35,25 @@ export class CriteriaService {
     }
 
     static async getByGroup(userId: string, groupId: string): Promise<Criterion[]> {
+        const q = query(
+            this.getCollectionRef(userId),
+            where('groupId', '==', groupId),
+            orderBy('createdAt', 'asc')
+        );
+        const snapshot = await getDocs(q);
+
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            groupId: doc.data().groupId ?? '',
+            name: doc.data().name,
+            dataType: doc.data().dataType,
+            impactType: doc.data().impactType,
+            weight: doc.data().weight ?? 0,
+            createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
+        }));
+    }
+
+    static async getByGroup(userId: string, groupId: string): Promise<Criterion[]> {
         try {
             const q = query(
                 this.getCollectionRef(userId),
