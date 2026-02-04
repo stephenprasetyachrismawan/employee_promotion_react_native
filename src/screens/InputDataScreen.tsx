@@ -39,13 +39,17 @@ export default function InputDataScreen({ navigation }: any) {
         return unsubscribe;
     }, [navigation]);
 
-    const loadData = async () => {
+    const loadData = async (preferredGroupId?: string | null) => {
         if (!user) return;
         try {
             const groupsData = await CriteriaGroupService.getAllByType(user.uid, 'input');
             setGroups(groupsData);
 
-            const activeGroup = selectedGroup ?? groupsData[0] ?? null;
+            const activeGroup = preferredGroupId
+                ? groupsData.find((group) => group.id === preferredGroupId) ?? null
+                : selectedGroup
+                    ? groupsData.find((group) => group.id === selectedGroup.id) ?? null
+                    : groupsData[0] ?? null;
             setSelectedGroup(activeGroup);
 
             if (activeGroup) {
@@ -79,7 +83,7 @@ export default function InputDataScreen({ navigation }: any) {
                     onPress: async () => {
                         try {
                             await CandidateService.delete(user.uid, id);
-                            loadData();
+                            await loadData();
                         } catch (error) {
                             console.error('Error deleting candidate:', error);
                         }
@@ -103,10 +107,7 @@ export default function InputDataScreen({ navigation }: any) {
                     onPress: async () => {
                         try {
                             await CriteriaGroupService.delete(user.uid, id);
-                            if (selectedGroup?.id === id) {
-                                setSelectedGroup(null);
-                            }
-                            loadData();
+                            await loadData();
                         } catch (error) {
                             console.error('Error deleting group:', error);
                         }
@@ -129,11 +130,7 @@ export default function InputDataScreen({ navigation }: any) {
                     onPress: async () => {
                         try {
                             const newGroupId = await CriteriaGroupService.duplicate(user.uid, id);
-                            await loadData();
-                            const newGroup = await CriteriaGroupService.getById(user.uid, newGroupId);
-                            if (newGroup) {
-                                setSelectedGroup(newGroup);
-                            }
+                            await loadData(newGroupId);
                         } catch (error) {
                             console.error('Error duplicating group:', error);
                         }

@@ -20,6 +20,7 @@ export default function CriteriaListScreen({ navigation }: any) {
     const [groups, setGroups] = useState<CriteriaGroup[]>([]);
     const [criteriaCounts, setCriteriaCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         loadCriteria();
@@ -32,6 +33,16 @@ export default function CriteriaListScreen({ navigation }: any) {
 
         return unsubscribe;
     }, [navigation]);
+
+    useEffect(() => {
+        setExpandedGroups((prev) => {
+            const next: Record<string, boolean> = {};
+            groups.forEach((group) => {
+                next[group.id] = prev[group.id] ?? true;
+            });
+            return next;
+        });
+    }, [groups]);
 
     const loadCriteria = async () => {
         if (!user) return;
@@ -106,53 +117,98 @@ export default function CriteriaListScreen({ navigation }: any) {
         );
     };
 
+    const toggleGroup = (groupId: string) => {
+        setExpandedGroups((prev) => ({
+            ...prev,
+            [groupId]: !prev[groupId],
+        }));
+    };
+
     const renderGroup = ({ item }: { item: CriteriaGroup }) => {
         const count = criteriaCounts[item.id] ?? 0;
+        const isExpanded = expandedGroups[item.id] ?? true;
 
         return (
             <View style={styles.groupCard}>
                 <TouchableOpacity
-                    style={styles.groupContent}
+                    style={styles.groupHeader}
                     activeOpacity={0.7}
-                    onPress={() => navigation.navigate('CriteriaGroupDetail', { groupId: item.id })}
+                    onPress={() => toggleGroup(item.id)}
                 >
-                    <View style={styles.iconContainer}>
-                        <FontAwesome5 name="layer-group" size={24} color={colors.primary} />
-                    </View>
-                    <View style={styles.groupInfo}>
-                        <View style={styles.groupTitleRow}>
-                            <Text style={styles.groupName}>{item.name}</Text>
+                    <View style={styles.groupContent}>
+                        <View style={styles.iconContainer}>
+                            <FontAwesome5 name="layer-group" size={24} color={colors.primary} />
                         </View>
+                        <View style={styles.groupInfo}>
+                            <View style={styles.groupTitleRow}>
+                                <Text style={styles.groupName}>{item.name}</Text>
+                                <View
+                                    style={[
+                                        styles.methodBadge,
+                                        item.method === 'SAW'
+                                            ? styles.methodBadgeSaw
+                                            : styles.methodBadgeWpm,
+                                    ]}
+                                >
+                                    <Text style={styles.methodBadgeText}>{item.method}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                    <FontAwesome5
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color={colors.textSecondary}
+                    />
+                </TouchableOpacity>
+                {isExpanded && (
+                    <View style={styles.groupDetails}>
                         <Text style={styles.groupMeta}>
                             {count} {count === 1 ? 'criterion' : 'criteria'}
                         </Text>
+                        <View style={styles.actions}>
+                            <TouchableOpacity
+                                style={styles.detailButton}
+                                onPress={() =>
+                                    navigation.navigate('CriteriaGroupDetail', { groupId: item.id })
+                                }
+                            >
+                                <Text style={styles.detailButtonText}>Lihat Detail</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() =>
+                                    navigation.navigate('CriteriaGroupForm', {
+                                        groupId: item.id,
+                                        mode: 'edit',
+                                    })
+                                }
+                            >
+                                <FontAwesome5
+                                    name="edit"
+                                    size={20}
+                                    color={colors.textSecondary}
+                                />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() => handleDuplicate(item.id, item.name)}
+                            >
+                                <FontAwesome5
+                                    name="copy"
+                                    size={20}
+                                    color={colors.textSecondary}
+                                />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() => handleDelete(item.id, item.name)}
+                            >
+                                <FontAwesome5 name="trash" size={20} color={colors.error} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </TouchableOpacity>
-                <View style={styles.actions}>
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() =>
-                            navigation.navigate('CriteriaGroupForm', {
-                                groupId: item.id,
-                                mode: 'edit',
-                            })
-                        }
-                    >
-                        <FontAwesome5 name="edit" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleDuplicate(item.id, item.name)}
-                    >
-                        <FontAwesome5 name="copy" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleDelete(item.id, item.name)}
-                    >
-                        <FontAwesome5 name="trash" size={20} color={colors.error} />
-                    </TouchableOpacity>
-                </View>
+                )}
             </View>
         );
     };
@@ -220,14 +276,17 @@ const styles = StyleSheet.create({
     },
 
     groupCard: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         marginBottom: spacing.md,
         ...shadows.sm,
+    },
+
+    groupHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
     },
 
     groupContent: {
@@ -269,13 +328,33 @@ const styles = StyleSheet.create({
         marginTop: spacing.xs,
     },
 
+    groupDetails: {
+        marginTop: spacing.md,
+    },
+
     actions: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
         gap: spacing.sm,
+        marginTop: spacing.sm,
     },
 
     actionButton: {
         padding: spacing.sm,
+    },
+
+    detailButton: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        backgroundColor: colors.background,
+        borderRadius: borderRadius.full,
+    },
+
+    detailButtonText: {
+        fontSize: typography.sm,
+        fontWeight: typography.semibold,
+        color: colors.primary,
     },
 
     emptyState: {

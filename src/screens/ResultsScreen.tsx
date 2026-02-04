@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 interface CandidateResultCardProps {
     result: DecisionResult;
     criteria: Criterion[];
+    maxScore: number;
     onToggle: () => void;
     isExpanded: boolean;
 }
@@ -29,12 +30,14 @@ interface GroupResults {
     group: CriteriaGroup;
     criteria: Criterion[];
     results: DecisionResult[];
+    maxScore: number;
     status: 'ready' | 'missingCriteria' | 'missingCandidates' | 'invalidWeights';
 }
 
 const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
     result,
     criteria,
+    maxScore,
     onToggle,
     isExpanded,
 }) => {
@@ -45,6 +48,8 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
         return colors.textTertiary;
     };
 
+    const scorePercentage = maxScore > 0 ? (result.score / maxScore) * 100 : 0;
+
     return (
         <TouchableOpacity
             style={[
@@ -53,13 +58,12 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
             ]}
             onPress={onToggle}
         >
+            <View style={styles.rankBadge}>
+                <Text style={[styles.rankNumber, { color: getRankColor(result.rank) }]}>
+                    {result.rank}
+                </Text>
+            </View>
             <View style={styles.resultHeader}>
-                <View style={styles.rankBadge}>
-                    <Text style={[styles.rankNumber, { color: getRankColor(result.rank) }]}>
-                        {result.rank}
-                    </Text>
-                </View>
-
                 {result.imageUri ? (
                     <Image source={{ uri: result.imageUri }} style={styles.candidateAvatar} />
                 ) : (
@@ -72,10 +76,10 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
                     <Text style={styles.candidateName}>{result.candidateName}</Text>
                     <View style={styles.scoreBar}>
                         <View
-                            style={[styles.scoreBarFill, { width: `${result.score}%` }]}
+                            style={[styles.scoreBarFill, { width: `${scorePercentage}%` }]}
                         />
                     </View>
-                    <Text style={styles.scoreText}>{result.score.toFixed(2)}%</Text>
+                    <Text style={styles.scoreText}>Skor: {result.score.toFixed(4)}</Text>
                 </View>
 
                 {result.rank === 1 && (
@@ -114,6 +118,7 @@ export default function ResultsScreen({ navigation }: any) {
     const [groupResults, setGroupResults] = useState<GroupResults[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -127,6 +132,16 @@ export default function ResultsScreen({ navigation }: any) {
 
         return unsubscribe;
     }, [navigation]);
+
+    useEffect(() => {
+        setExpandedGroups((prev) => {
+            const next: Record<string, boolean> = {};
+            groupResults.forEach((groupResult) => {
+                next[groupResult.group.id] = prev[groupResult.group.id] ?? true;
+            });
+            return next;
+        });
+    }, [groupResults]);
 
     const loadResults = async () => {
         setLoading(true);
@@ -181,13 +196,18 @@ export default function ResultsScreen({ navigation }: any) {
 
                     const calculatedResults =
                         group.method === 'SAW'
-                            ? SAWCalculator.calculateNormalized(candidatesData, criteriaData)
-                            : WPMCalculator.calculateNormalized(candidatesData, criteriaData);
+                            ? SAWCalculator.calculate(candidatesData, criteriaData)
+                            : WPMCalculator.calculate(candidatesData, criteriaData);
+                    const maxScore = Math.max(
+                        0,
+                        ...calculatedResults.map((result) => result.score)
+                    );
 
                     return {
                         group,
                         criteria: criteriaData,
                         results: calculatedResults,
+                        maxScore,
                         status: 'ready' as const,
                     };
                 })
@@ -204,6 +224,13 @@ export default function ResultsScreen({ navigation }: any) {
 
     const toggleExpand = (candidateId: string) => {
         setExpandedId(expandedId === candidateId ? null : candidateId);
+    };
+
+    const toggleGroup = (groupId: string) => {
+        setExpandedGroups((prev) => ({
+            ...prev,
+            [groupId]: !prev[groupId],
+        }));
     };
 
     if (error) {
@@ -244,7 +271,11 @@ export default function ResultsScreen({ navigation }: any) {
                 <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
                     {groupResults.map((groupResult) => (
                         <View key={groupResult.group.id} style={styles.groupCard}>
-                            <View style={styles.groupHeader}>
+                            <TouchableOpacity
+                                style={styles.groupHeader}
+                                activeOpacity={0.7}
+                                onPress={() => toggleGroup(groupResult.group.id)}
+                            >
                                 <View>
                                     <Text style={styles.groupTitle}>{groupResult.group.name}</Text>
                                     <Text style={styles.groupSubtitle}>
@@ -279,30 +310,43 @@ export default function ResultsScreen({ navigation }: any) {
                                             }
                                         />
                                     </View>
-                                </View>
-                            </View>
-
-                            {groupResult.status !== 'ready' ? (
-                                <View style={styles.groupMessage}>
-                                    <Text style={styles.groupMessageText}>
-                                        {groupResult.status === 'missingCriteria' &&
-                                            'Tambahkan criteria untuk grup ini.'}
-                                        {groupResult.status === 'missingCandidates' &&
-                                            'Tambahkan data kandidat untuk grup ini.'}
-                                        {groupResult.status === 'invalidWeights' &&
-                                            'Total bobot harus 100%.'}
-                                    </Text>
-                                </View>
-                            ) : (
-                                groupResult.results.map((result) => (
-                                    <CandidateResultCard
-                                        key={result.candidateId}
-                                        result={result}
-                                        criteria={groupResult.criteria}
-                                        onToggle={() => toggleExpand(result.candidateId)}
-                                        isExpanded={expandedId === result.candidateId}
+                                    <FontAwesome5
+                                        name={
+                                            expandedGroups[groupResult.group.id]
+                                                ? 'chevron-up'
+                                                : 'chevron-down'
+                                        }
+                                        size={18}
+                                        color={colors.textSecondary}
                                     />
-                                ))
+                                </View>
+                            </TouchableOpacity>
+
+                            {expandedGroups[groupResult.group.id] && (
+                                <>
+                                    {groupResult.status !== 'ready' ? (
+                                        <View style={styles.groupMessage}>
+                                            <Text style={styles.groupMessageText}>
+                                                {groupResult.status === 'missingCriteria' &&
+                                                    'Tambahkan criteria untuk grup ini.'}
+                                                {groupResult.status === 'missingCandidates' &&
+                                                    'Tambahkan data kandidat untuk grup ini.'}
+                                                {groupResult.status === 'invalidWeights' &&
+                                                    'Total bobot harus 100%.'}
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        groupResult.results.map((result) => (
+                                            <CandidateResultCard
+                                                key={result.candidateId}
+                                                result={result}
+                                                criteria={groupResult.criteria}
+                                                onToggle={() => toggleExpand(result.candidateId)}
+                                                isExpanded={expandedId === result.candidateId}
+                                            />
+                                        ))
+                                    )}
+                                </>
                             )}
                         </View>
                     ))}
@@ -422,6 +466,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         marginBottom: spacing.md,
+        position: 'relative',
         ...shadows.md,
     },
 
@@ -438,16 +483,20 @@ const styles = StyleSheet.create({
     },
 
     rankBadge: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        position: 'absolute',
+        top: spacing.sm,
+        right: spacing.sm,
+        minWidth: 24,
+        height: 24,
+        paddingHorizontal: spacing.xs,
+        borderRadius: borderRadius.full,
         backgroundColor: colors.dark.surface,
         justifyContent: 'center',
         alignItems: 'center',
     },
 
     rankNumber: {
-        fontSize: typography.lg,
+        fontSize: typography.sm,
         fontWeight: typography.bold,
     },
 
