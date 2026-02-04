@@ -37,7 +37,8 @@ export class CriteriaService {
     static async getByGroup(userId: string, groupId: string): Promise<Criterion[]> {
         const q = query(
             this.getCollectionRef(userId),
-            where('groupId', '==', groupId)
+            where('groupId', '==', groupId),
+            orderBy('createdAt', 'asc')
         );
         const snapshot = await getDocs(q);
 
