@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { CriteriaGroup } from '../../types';
+import { CriteriaService } from './CriteriaService';
 
 export class CriteriaGroupService {
     private static getCollectionRef(userId: string) {
@@ -105,5 +106,37 @@ export class CriteriaGroupService {
                 await Promise.all(valuesSnapshot.docs.map(doc => deleteDoc(doc.ref)));
             })
         );
+    }
+
+    static async duplicate(userId: string, id: string): Promise<string> {
+        const [group, criteria] = await Promise.all([
+            this.getById(userId, id),
+            CriteriaService.getByGroup(userId, id),
+        ]);
+
+        if (!group) {
+            throw new Error('Criteria group not found');
+        }
+
+        const newGroupId = await this.create(
+            userId,
+            `${group.name} (Copy)`,
+            group.description ?? undefined
+        );
+
+        await Promise.all(
+            criteria.map((criterion) =>
+                addDoc(this.getCriteriaRef(userId), {
+                    groupId: newGroupId,
+                    name: criterion.name,
+                    dataType: criterion.dataType,
+                    impactType: criterion.impactType,
+                    weight: criterion.weight ?? 0,
+                    createdAt: Timestamp.now(),
+                })
+            )
+        );
+
+        return newGroupId;
     }
 }
