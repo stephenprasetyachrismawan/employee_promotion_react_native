@@ -119,6 +119,7 @@ export default function ResultsScreen({ navigation }: any) {
     const [groupResults, setGroupResults] = useState<GroupResults[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -132,6 +133,16 @@ export default function ResultsScreen({ navigation }: any) {
 
         return unsubscribe;
     }, [navigation]);
+
+    useEffect(() => {
+        setExpandedGroups((prev) => {
+            const next: Record<string, boolean> = {};
+            groupResults.forEach((groupResult) => {
+                next[groupResult.group.id] = prev[groupResult.group.id] ?? true;
+            });
+            return next;
+        });
+    }, [groupResults]);
 
     const loadResults = async () => {
         setLoading(true);
@@ -216,6 +227,13 @@ export default function ResultsScreen({ navigation }: any) {
         setExpandedId(expandedId === candidateId ? null : candidateId);
     };
 
+    const toggleGroup = (groupId: string) => {
+        setExpandedGroups((prev) => ({
+            ...prev,
+            [groupId]: !prev[groupId],
+        }));
+    };
+
     if (error) {
         return (
             <SafeAreaView style={styles.container}>
@@ -254,7 +272,11 @@ export default function ResultsScreen({ navigation }: any) {
                 <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
                     {groupResults.map((groupResult) => (
                         <View key={groupResult.group.id} style={styles.groupCard}>
-                            <View style={styles.groupHeader}>
+                            <TouchableOpacity
+                                style={styles.groupHeader}
+                                activeOpacity={0.7}
+                                onPress={() => toggleGroup(groupResult.group.id)}
+                            >
                                 <View>
                                     <Text style={styles.groupTitle}>{groupResult.group.name}</Text>
                                     <Text style={styles.groupSubtitle}>
@@ -289,31 +311,43 @@ export default function ResultsScreen({ navigation }: any) {
                                             }
                                         />
                                     </View>
-                                </View>
-                            </View>
-
-                            {groupResult.status !== 'ready' ? (
-                                <View style={styles.groupMessage}>
-                                    <Text style={styles.groupMessageText}>
-                                        {groupResult.status === 'missingCriteria' &&
-                                            'Tambahkan criteria untuk grup ini.'}
-                                        {groupResult.status === 'missingCandidates' &&
-                                            'Tambahkan data kandidat untuk grup ini.'}
-                                        {groupResult.status === 'invalidWeights' &&
-                                            'Total bobot harus 100%.'}
-                                    </Text>
-                                </View>
-                            ) : (
-                                groupResult.results.map((result) => (
-                                    <CandidateResultCard
-                                        key={result.candidateId}
-                                        result={result}
-                                        criteria={groupResult.criteria}
-                                        maxScore={groupResult.maxScore}
-                                        onToggle={() => toggleExpand(result.candidateId)}
-                                        isExpanded={expandedId === result.candidateId}
+                                    <FontAwesome5
+                                        name={
+                                            expandedGroups[groupResult.group.id]
+                                                ? 'chevron-up'
+                                                : 'chevron-down'
+                                        }
+                                        size={18}
+                                        color={colors.textSecondary}
                                     />
-                                ))
+                                </View>
+                            </TouchableOpacity>
+
+                            {expandedGroups[groupResult.group.id] && (
+                                <>
+                                    {groupResult.status !== 'ready' ? (
+                                        <View style={styles.groupMessage}>
+                                            <Text style={styles.groupMessageText}>
+                                                {groupResult.status === 'missingCriteria' &&
+                                                    'Tambahkan criteria untuk grup ini.'}
+                                                {groupResult.status === 'missingCandidates' &&
+                                                    'Tambahkan data kandidat untuk grup ini.'}
+                                                {groupResult.status === 'invalidWeights' &&
+                                                    'Total bobot harus 100%.'}
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        groupResult.results.map((result) => (
+                                            <CandidateResultCard
+                                                key={result.candidateId}
+                                                result={result}
+                                                criteria={groupResult.criteria}
+                                                onToggle={() => toggleExpand(result.candidateId)}
+                                                isExpanded={expandedId === result.candidateId}
+                                            />
+                                        ))
+                                    )}
+                                </>
                             )}
                         </View>
                     ))}
