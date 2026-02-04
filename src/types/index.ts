@@ -46,6 +46,7 @@ export interface CandidateWithValues extends Candidate {
 export interface WPMResult {
     candidateId: string;
     candidateName: string;
+    imageUri?: string | null;
     score: number;
     rank: number;
     values: Record<string, number>;
