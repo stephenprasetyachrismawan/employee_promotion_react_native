@@ -42,7 +42,7 @@ export default function InputDataScreen({ navigation }: any) {
     const loadData = async (preferredGroupId?: string | null) => {
         if (!user) return;
         try {
-            const groupsData = await CriteriaGroupService.getAll(user.uid);
+            const groupsData = await CriteriaGroupService.getAllByType(user.uid, 'input');
             setGroups(groupsData);
 
             const activeGroup = preferredGroupId
@@ -214,16 +214,16 @@ export default function InputDataScreen({ navigation }: any) {
                     <Text style={styles.sectionLabel}>Kelompok Input</Text>
                     <TouchableOpacity
                         style={styles.addGroupButton}
-                        onPress={() => navigation.navigate('CriteriaGroupForm', { mode: 'add' })}
+                        onPress={() => navigation.navigate('InputGroupForm', { mode: 'add' })}
                     >
                         <FontAwesome5 name="plus" size={12} color={colors.primary} />
-                        <Text style={styles.addGroupText}>Tambah Grup</Text>
+                        <Text style={styles.addGroupText}>Tambah Grup Input</Text>
                     </TouchableOpacity>
                 </View>
                 {groups.length === 0 ? (
                     <View style={styles.emptyGroupCard}>
                         <Text style={styles.emptyGroupText}>
-                            Belum ada kelompok. Tambahkan di menu Criteria.
+                            Belum ada grup input. Tambahkan di menu Input.
                         </Text>
                     </View>
                 ) : (
@@ -279,7 +279,7 @@ export default function InputDataScreen({ navigation }: any) {
                                         <TouchableOpacity
                                             style={styles.groupActionButton}
                                             onPress={() =>
-                                                navigation.navigate('CriteriaGroupForm', {
+                                                navigation.navigate('InputGroupForm', {
                                                     groupId: item.id,
                                                     mode: 'edit',
                                                 })

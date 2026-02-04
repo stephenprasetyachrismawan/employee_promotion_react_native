@@ -48,7 +48,7 @@ export default function CriteriaListScreen({ navigation }: any) {
         if (!user) return;
 
         try {
-            const data = await CriteriaGroupService.getAll(user.uid);
+            const data = await CriteriaGroupService.getAllByType(user.uid, 'criteria');
             setGroups(data);
             const counts = await Promise.all(
                 data.map(async (group) => ({
@@ -318,26 +318,6 @@ const styles = StyleSheet.create({
 
     groupName: {
         fontSize: typography.base,
-        fontWeight: typography.semibold,
-        color: colors.textPrimary,
-    },
-
-    methodBadge: {
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        borderRadius: borderRadius.full,
-    },
-
-    methodBadgeWpm: {
-        backgroundColor: colors.primary + '20',
-    },
-
-    methodBadgeSaw: {
-        backgroundColor: colors.benefit + '20',
-    },
-
-    methodBadgeText: {
-        fontSize: typography.xs,
         fontWeight: typography.semibold,
         color: colors.textPrimary,
     },

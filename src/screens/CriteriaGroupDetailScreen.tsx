@@ -157,6 +157,8 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
         }
     };
 
+    const isReadOnly = group?.groupType === 'input' && !!group.sourceGroupId;
+
     const renderCriterion = ({ item }: { item: Criterion }) => {
         const isBenefit = item.impactType === 'BENEFIT';
         const iconColor = isBenefit ? colors.benefit : colors.cost;
@@ -193,36 +195,38 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
                         />
                     </View>
                 </View>
-                <View style={styles.actions}>
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleToggleLock(item.id)}
-                    >
-                        <FontAwesome5
-                            name={isLocked ? 'lock' : 'lock-open'}
-                            size={18}
-                            color={isLocked ? colors.textSecondary : colors.primary}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() =>
-                            navigation.navigate('CriterionForm', {
-                                criterionId: item.id,
-                                groupId,
-                                mode: 'edit',
-                            })
-                        }
-                    >
-                        <FontAwesome5 name="edit" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleDelete(item.id, item.name)}
-                    >
-                        <FontAwesome5 name="trash" size={20} color={colors.error} />
-                    </TouchableOpacity>
-                </View>
+                {!isReadOnly ? (
+                    <View style={styles.actions}>
+                        <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() => handleToggleLock(item.id)}
+                        >
+                            <FontAwesome5
+                                name={isLocked ? 'lock' : 'lock-open'}
+                                size={18}
+                                color={isLocked ? colors.textSecondary : colors.primary}
+                            />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() =>
+                                navigation.navigate('CriterionForm', {
+                                    criterionId: item.id,
+                                    groupId,
+                                    mode: 'edit',
+                                })
+                            }
+                        >
+                            <FontAwesome5 name="edit" size={20} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() => handleDelete(item.id, item.name)}
+                        >
+                            <FontAwesome5 name="trash" size={20} color={colors.error} />
+                        </TouchableOpacity>
+                    </View>
+                ) : null}
             </View>
         );
     };
@@ -247,9 +251,11 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
             <View style={[styles.totalCard, isWeightValid && styles.totalCardValid]}>
                 <View style={styles.totalHeader}>
                     <Text style={styles.totalLabel}>Total Weight</Text>
-                    <TouchableOpacity style={styles.autoButton} onPress={handleAutoDistribute}>
-                        <Text style={styles.autoButtonText}>Set Auto</Text>
-                    </TouchableOpacity>
+                    {!isReadOnly ? (
+                        <TouchableOpacity style={styles.autoButton} onPress={handleAutoDistribute}>
+                            <Text style={styles.autoButtonText}>Set Auto</Text>
+                        </TouchableOpacity>
+                    ) : null}
                 </View>
                 <Text style={[styles.totalValue, isWeightValid && styles.totalValueValid]}>
                     {Math.round(totalWeight)}%
@@ -257,6 +263,11 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
                 {!isWeightValid && (
                     <Text style={styles.totalHint}>Total bobot harus 100%</Text>
                 )}
+                {isReadOnly ? (
+                    <Text style={styles.readOnlyHint}>
+                        Kriteria grup input tidak bisa diubah.
+                    </Text>
+                ) : null}
             </View>
 
             {criteria.length === 0 && !loading ? (
@@ -276,12 +287,14 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
                 />
             )}
 
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() => navigation.navigate('CriterionForm', { mode: 'add', groupId })}
-            >
-                <FontAwesome5 name="plus" size={28} color={colors.surface} />
-            </TouchableOpacity>
+            {!isReadOnly ? (
+                <TouchableOpacity
+                    style={styles.fab}
+                    onPress={() => navigation.navigate('CriterionForm', { mode: 'add', groupId })}
+                >
+                    <FontAwesome5 name="plus" size={28} color={colors.surface} />
+                </TouchableOpacity>
+            ) : null}
         </SafeAreaView>
     );
 }
@@ -376,6 +389,12 @@ const styles = StyleSheet.create({
     totalHint: {
         fontSize: typography.sm,
         color: colors.error,
+        marginTop: spacing.xs,
+    },
+
+    readOnlyHint: {
+        fontSize: typography.sm,
+        color: colors.textSecondary,
         marginTop: spacing.xs,
     },
 
