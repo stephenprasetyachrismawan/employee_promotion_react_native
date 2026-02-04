@@ -85,11 +85,12 @@ export default function CriteriaListScreen({ navigation }: any) {
         const count = criteriaCounts[item.id] ?? 0;
 
         return (
-            <TouchableOpacity
-                style={styles.groupCard}
-                onPress={() => navigation.navigate('CriteriaGroupDetail', { groupId: item.id })}
-            >
-                <View style={styles.groupContent}>
+            <View style={styles.groupCard}>
+                <TouchableOpacity
+                    style={styles.groupContent}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate('CriteriaGroupDetail', { groupId: item.id })}
+                >
                     <View style={styles.iconContainer}>
                         <FontAwesome5 name="layer-group" size={24} color={colors.primary} />
                     </View>
@@ -99,7 +100,7 @@ export default function CriteriaListScreen({ navigation }: any) {
                             {count} {count === 1 ? 'criterion' : 'criteria'}
                         </Text>
                     </View>
-                </View>
+                </TouchableOpacity>
                 <View style={styles.actions}>
                     <TouchableOpacity
                         style={styles.actionButton}
@@ -119,7 +120,7 @@ export default function CriteriaListScreen({ navigation }: any) {
                         <FontAwesome5 name="trash" size={20} color={colors.error} />
                     </TouchableOpacity>
                 </View>
-            </TouchableOpacity>
+            </View>
         );
     };
 
