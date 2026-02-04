@@ -37,7 +37,7 @@ export default function CriteriaListScreen({ navigation }: any) {
         if (!user) return;
 
         try {
-            const data = await CriteriaGroupService.getAll(user.uid);
+            const data = await CriteriaGroupService.getAllByType(user.uid, 'criteria');
             setGroups(data);
             const counts = await Promise.all(
                 data.map(async (group) => ({
@@ -122,14 +122,6 @@ export default function CriteriaListScreen({ navigation }: any) {
                     <View style={styles.groupInfo}>
                         <View style={styles.groupTitleRow}>
                             <Text style={styles.groupName}>{item.name}</Text>
-                            <View
-                                style={[
-                                    styles.methodBadge,
-                                    item.method === 'SAW' ? styles.methodBadgeSaw : styles.methodBadgeWpm,
-                                ]}
-                            >
-                                <Text style={styles.methodBadgeText}>{item.method}</Text>
-                            </View>
                         </View>
                         <Text style={styles.groupMeta}>
                             {count} {count === 1 ? 'criterion' : 'criteria'}
@@ -267,26 +259,6 @@ const styles = StyleSheet.create({
 
     groupName: {
         fontSize: typography.base,
-        fontWeight: typography.semibold,
-        color: colors.textPrimary,
-    },
-
-    methodBadge: {
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        borderRadius: borderRadius.full,
-    },
-
-    methodBadgeWpm: {
-        backgroundColor: colors.primary + '20',
-    },
-
-    methodBadgeSaw: {
-        backgroundColor: colors.benefit + '20',
-    },
-
-    methodBadgeText: {
-        fontSize: typography.xs,
         fontWeight: typography.semibold,
         color: colors.textPrimary,
     },

@@ -7,7 +7,6 @@ import {
     TextInput,
     SafeAreaView,
     Alert,
-    TouchableOpacity,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../styles/theme';
 import { Button } from '../components/common/Button';
@@ -21,7 +20,6 @@ export default function CriteriaGroupFormScreen({ route, navigation }: any) {
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-    const [method, setMethod] = useState<'WPM' | 'SAW'>('WPM');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -37,7 +35,6 @@ export default function CriteriaGroupFormScreen({ route, navigation }: any) {
             if (group) {
                 setName(group.name);
                 setDescription(group.description ?? '');
-                setMethod(group.method ?? 'WPM');
             }
         } catch (error) {
             console.error('Error loading criteria group:', error);
@@ -59,15 +56,15 @@ export default function CriteriaGroupFormScreen({ route, navigation }: any) {
                     user.uid,
                     groupId,
                     name.trim(),
-                    description.trim(),
-                    method
+                    description.trim()
                 );
             } else {
                 await CriteriaGroupService.create(
                     user.uid,
                     name.trim(),
                     description.trim(),
-                    method
+                    'WPM',
+                    'criteria'
                 );
             }
             navigation.goBack();
@@ -101,50 +98,6 @@ export default function CriteriaGroupFormScreen({ route, navigation }: any) {
                     multiline
                 />
 
-                <Text style={styles.sectionTitle}>Metode Perhitungan</Text>
-                <Text style={styles.sectionSubtitle}>
-                    Pilih metode Decision Support System untuk grup ini
-                </Text>
-                <View style={styles.methodOptions}>
-                    <TouchableOpacity
-                        style={[
-                            styles.methodOption,
-                            method === 'WPM' && styles.methodOptionActive,
-                        ]}
-                        onPress={() => setMethod('WPM')}
-                    >
-                        <Text
-                            style={[
-                                styles.methodOptionText,
-                                method === 'WPM' && styles.methodOptionTextActive,
-                            ]}
-                        >
-                            Weighted Product (WPM)
-                        </Text>
-                        <Text style={styles.methodHint}>
-                            Perkalian berbobot, nilai harus &gt; 0
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[
-                            styles.methodOption,
-                            method === 'SAW' && styles.methodOptionActive,
-                        ]}
-                        onPress={() => setMethod('SAW')}
-                    >
-                        <Text
-                            style={[
-                                styles.methodOptionText,
-                                method === 'SAW' && styles.methodOptionTextActive,
-                            ]}
-                        >
-                            SAW (Simple Additive Weighting)
-                        </Text>
-                        <Text style={styles.methodHint}>
-                            Normalisasi &amp; penjumlahan berbobot
-                        </Text>
-                    </TouchableOpacity>
-                </View>
             </ScrollView>
 
             <View style={styles.footer}>
@@ -186,11 +139,6 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
     },
 
-    sectionSubtitle: {
-        fontSize: typography.sm,
-        color: colors.textSecondary,
-        marginBottom: spacing.md,
-    },
 
     input: {
         backgroundColor: colors.surface,
@@ -205,39 +153,6 @@ const styles = StyleSheet.create({
     textArea: {
         minHeight: 120,
         textAlignVertical: 'top',
-    },
-
-    methodOptions: {
-        gap: spacing.md,
-    },
-
-    methodOption: {
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-    },
-
-    methodOptionActive: {
-        borderColor: colors.primary,
-        backgroundColor: colors.primary + '10',
-    },
-
-    methodOptionText: {
-        fontSize: typography.base,
-        fontWeight: typography.semibold,
-        color: colors.textPrimary,
-        marginBottom: spacing.xs,
-    },
-
-    methodOptionTextActive: {
-        color: colors.primary,
-    },
-
-    methodHint: {
-        fontSize: typography.sm,
-        color: colors.textSecondary,
     },
 
     footer: {

@@ -20,6 +20,8 @@ export interface CriteriaGroup {
     name: string;
     description?: string | null;
     method: DecisionMethod;
+    groupType?: 'criteria' | 'input' | null;
+    sourceGroupId?: string | null;
     createdAt: string;
 }
 

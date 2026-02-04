@@ -41,6 +41,8 @@ export class CriteriaGroupService {
             name: doc.data().name,
             description: doc.data().description ?? null,
             method: (doc.data().method as DecisionMethod) ?? 'WPM',
+            groupType: (doc.data().groupType as CriteriaGroup['groupType']) ?? null,
+            sourceGroupId: doc.data().sourceGroupId ?? null,
             createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         }));
     }
@@ -58,20 +60,37 @@ export class CriteriaGroupService {
             name: docSnap.data().name,
             description: docSnap.data().description ?? null,
             method: (docSnap.data().method as DecisionMethod) ?? 'WPM',
+            groupType: (docSnap.data().groupType as CriteriaGroup['groupType']) ?? null,
+            sourceGroupId: docSnap.data().sourceGroupId ?? null,
             createdAt: docSnap.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         };
+    }
+
+    static async getAllByType(
+        userId: string,
+        groupType: NonNullable<CriteriaGroup['groupType']>
+    ): Promise<CriteriaGroup[]> {
+        const groups = await this.getAll(userId);
+        if (groupType === 'input') {
+            return groups.filter((group) => group.groupType === 'input' || !group.groupType);
+        }
+        return groups.filter((group) => group.groupType === groupType);
     }
 
     static async create(
         userId: string,
         name: string,
         description?: string,
-        method: DecisionMethod = 'WPM'
+        method: DecisionMethod = 'WPM',
+        groupType: CriteriaGroup['groupType'] = 'criteria',
+        sourceGroupId?: string | null
     ): Promise<string> {
         const docRef = await addDoc(this.getCollectionRef(userId), {
             name,
             description: description ?? null,
             method,
+            groupType,
+            sourceGroupId: sourceGroupId ?? null,
             createdAt: Timestamp.now(),
         });
 
@@ -83,14 +102,17 @@ export class CriteriaGroupService {
         id: string,
         name: string,
         description?: string,
-        method: DecisionMethod = 'WPM'
+        method?: DecisionMethod
     ): Promise<void> {
         const docRef = doc(this.getCollectionRef(userId), id);
-        await updateDoc(docRef, {
+        const payload: Record<string, unknown> = {
             name,
             description: description ?? null,
-            method,
-        });
+        };
+        if (method) {
+            payload.method = method;
+        }
+        await updateDoc(docRef, payload);
     }
 
     static async delete(userId: string, id: string): Promise<void> {
@@ -132,7 +154,46 @@ export class CriteriaGroupService {
             userId,
             `${group.name} (Copy)`,
             group.description ?? undefined,
-            group.method ?? 'WPM'
+            group.method ?? 'WPM',
+            group.groupType ?? 'criteria',
+            group.sourceGroupId ?? null
+        );
+
+        await Promise.all(
+            criteria.map((criterion) =>
+                addDoc(this.getCriteriaRef(userId), {
+                    groupId: newGroupId,
+                    name: criterion.name,
+                    dataType: criterion.dataType,
+                    impactType: criterion.impactType,
+                    weight: criterion.weight ?? 0,
+                    createdAt: Timestamp.now(),
+                })
+            )
+        );
+
+        return newGroupId;
+    }
+
+    static async createInputGroupFromTemplate(
+        userId: string,
+        name: string,
+        description: string | undefined,
+        method: DecisionMethod,
+        templateGroupId: string
+    ): Promise<string> {
+        const criteria = await CriteriaService.getByGroup(userId, templateGroupId);
+        if (criteria.length === 0) {
+            throw new Error('Template group has no criteria');
+        }
+
+        const newGroupId = await this.create(
+            userId,
+            name,
+            description,
+            method,
+            'input',
+            templateGroupId
         );
 
         await Promise.all(

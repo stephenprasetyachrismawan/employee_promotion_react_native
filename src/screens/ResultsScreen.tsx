@@ -134,10 +134,10 @@ export default function ResultsScreen({ navigation }: any) {
 
         try {
             if (!user) return;
-            const groups = await CriteriaGroupService.getAll(user.uid);
+            const groups = await CriteriaGroupService.getAllByType(user.uid, 'input');
 
             if (groups.length === 0) {
-                setError('No criteria groups configured');
+                setError('No input groups configured');
                 return;
             }
 
@@ -219,7 +219,7 @@ export default function ResultsScreen({ navigation }: any) {
                     <FontAwesome5 name="exclamation-circle" size={64} color={colors.textTertiary} />
                     <Text style={styles.emptyText}>{error}</Text>
                     <Text style={styles.emptySubtext}>
-                        {error.includes('groups') && 'Add a criteria group to get started'}
+                        {error.includes('groups') && 'Add an input group to get started'}
                         {error.includes('Failed') && 'Try refreshing the results'}
                     </Text>
                 </View>
