@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 interface CandidateResultCardProps {
     result: DecisionResult;
     criteria: Criterion[];
+    maxScore: number;
     onToggle: () => void;
     isExpanded: boolean;
 }
@@ -29,12 +30,14 @@ interface GroupResults {
     group: CriteriaGroup;
     criteria: Criterion[];
     results: DecisionResult[];
+    maxScore: number;
     status: 'ready' | 'missingCriteria' | 'missingCandidates' | 'invalidWeights';
 }
 
 const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
     result,
     criteria,
+    maxScore,
     onToggle,
     isExpanded,
 }) => {
@@ -44,6 +47,8 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
         if (rank === 3) return '#CD7F32'; // Bronze
         return colors.textTertiary;
     };
+
+    const scorePercentage = maxScore > 0 ? (result.score / maxScore) * 100 : 0;
 
     return (
         <TouchableOpacity
@@ -72,10 +77,10 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
                     <Text style={styles.candidateName}>{result.candidateName}</Text>
                     <View style={styles.scoreBar}>
                         <View
-                            style={[styles.scoreBarFill, { width: `${result.score}%` }]}
+                            style={[styles.scoreBarFill, { width: `${scorePercentage}%` }]}
                         />
                     </View>
-                    <Text style={styles.scoreText}>{result.score.toFixed(2)}%</Text>
+                    <Text style={styles.scoreText}>Skor: {result.score.toFixed(4)}</Text>
                 </View>
 
                 {result.rank === 1 && (
@@ -192,13 +197,18 @@ export default function ResultsScreen({ navigation }: any) {
 
                     const calculatedResults =
                         group.method === 'SAW'
-                            ? SAWCalculator.calculateNormalized(candidatesData, criteriaData)
-                            : WPMCalculator.calculateNormalized(candidatesData, criteriaData);
+                            ? SAWCalculator.calculate(candidatesData, criteriaData)
+                            : WPMCalculator.calculate(candidatesData, criteriaData);
+                    const maxScore = Math.max(
+                        0,
+                        ...calculatedResults.map((result) => result.score)
+                    );
 
                     return {
                         group,
                         criteria: criteriaData,
                         results: calculatedResults,
+                        maxScore,
                         status: 'ready' as const,
                     };
                 })
