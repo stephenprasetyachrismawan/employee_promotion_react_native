@@ -81,6 +81,31 @@ export default function CriteriaListScreen({ navigation }: any) {
         );
     };
 
+    const handleDuplicate = (id: string, name: string) => {
+        if (!user) return;
+
+        Alert.alert(
+            'Duplicate Criteria Group',
+            `Duplicate "${name}" along with all criteria?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Duplicate',
+                    onPress: async () => {
+                        try {
+                            const newGroupId = await CriteriaGroupService.duplicate(user.uid, id);
+                            await loadCriteria();
+                            navigation.navigate('CriteriaGroupDetail', { groupId: newGroupId });
+                        } catch (error) {
+                            console.error('Error duplicating criteria group:', error);
+                            Alert.alert('Error', 'Failed to duplicate criteria group');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const renderGroup = ({ item }: { item: CriteriaGroup }) => {
         const count = criteriaCounts[item.id] ?? 0;
 
@@ -112,6 +137,12 @@ export default function CriteriaListScreen({ navigation }: any) {
                         }
                     >
                         <FontAwesome5 name="edit" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => handleDuplicate(item.id, item.name)}
+                    >
+                        <FontAwesome5 name="copy" size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.actionButton}
