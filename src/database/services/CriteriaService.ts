@@ -135,6 +135,11 @@ export class CriteriaService {
         });
     }
 
+    static async updateWeight(userId: string, id: string, weight: number): Promise<void> {
+        const docRef = doc(this.getCollectionRef(userId), id);
+        await updateDoc(docRef, { weight });
+    }
+
     static async delete(userId: string, id: string): Promise<void> {
         // Delete the criterion
         const docRef = doc(this.getCollectionRef(userId), id);
