@@ -17,7 +17,7 @@ import { CriteriaService } from '../database/services/CriteriaService';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function CriterionFormScreen({ route, navigation }: any) {
-    const { criterionId, mode } = route.params || { mode: 'add' };
+    const { criterionId, groupId, mode } = route.params || { mode: 'add' };
     const isEditMode = mode === 'edit';
     const { user } = useAuth();
 
@@ -25,6 +25,7 @@ export default function CriterionFormScreen({ route, navigation }: any) {
     const [dataType, setDataType] = useState<DataType>('NUMERIC');
     const [impactType, setImpactType] = useState<ImpactType>('BENEFIT');
     const [scalePreview, setScalePreview] = useState(3);
+    const [weight, setWeight] = useState('0');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -42,6 +43,7 @@ export default function CriterionFormScreen({ route, navigation }: any) {
                 setName(criterion.name);
                 setDataType(criterion.dataType);
                 setImpactType(criterion.impactType);
+                setWeight(criterion.weight?.toString() ?? '0');
             }
         } catch (error) {
             console.error('Error loading criterion:', error);
@@ -54,14 +56,34 @@ export default function CriterionFormScreen({ route, navigation }: any) {
             return;
         }
 
-        if (!user) return;
+        if (!user || !groupId) return;
+
+        const parsedWeight = Number(weight);
+        if (Number.isNaN(parsedWeight) || parsedWeight < 0 || parsedWeight > 100) {
+            Alert.alert('Error', 'Weight must be a number between 0 and 100');
+            return;
+        }
 
         setLoading(true);
         try {
             if (isEditMode) {
-                await CriteriaService.update(user.uid, criterionId, name.trim(), dataType, impactType);
+                await CriteriaService.update(
+                    user.uid,
+                    criterionId,
+                    name.trim(),
+                    dataType,
+                    impactType,
+                    parsedWeight
+                );
             } else {
-                await CriteriaService.create(user.uid, name.trim(), dataType, impactType);
+                await CriteriaService.create(
+                    user.uid,
+                    groupId,
+                    name.trim(),
+                    dataType,
+                    impactType,
+                    parsedWeight
+                );
             }
             navigation.goBack();
         } catch (error) {
@@ -173,6 +195,19 @@ export default function CriterionFormScreen({ route, navigation }: any) {
                     {impactType === 'BENEFIT'
                         ? 'Higher values are better (e.g., KPI Score, Experience)'
                         : 'Lower values are better (e.g., Ethics Breach, Attrition Risk)'}
+                </Text>
+
+                <Text style={styles.sectionTitle}>Weight (%)</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 25"
+                    placeholderTextColor={colors.textTertiary}
+                    keyboardType="numeric"
+                    value={weight}
+                    onChangeText={setWeight}
+                />
+                <Text style={styles.helpText}>
+                    Total bobot untuk grup harus 100%.
                 </Text>
             </ScrollView>
 

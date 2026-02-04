@@ -5,22 +5,26 @@ export type ImpactType = 'BENEFIT' | 'COST';
 // Criterion model
 export interface Criterion {
     id: string; // Changed from number to string for Firestore
+    groupId: string;
     name: string;
     dataType: DataType;
     impactType: ImpactType;
+    weight: number;
     createdAt: string;
 }
 
-// Weight model
-export interface Weight {
-    criterionId: string; // Changed from number to string
-    weight: number;
-    isLocked: boolean;
+// Criteria group model
+export interface CriteriaGroup {
+    id: string;
+    name: string;
+    description?: string | null;
+    createdAt: string;
 }
 
 // Candidate model
 export interface Candidate {
     id: string; // Changed from number to string for Firestore
+    groupId: string;
     name: string;
     imageUri?: string | null;
     createdAt: string;

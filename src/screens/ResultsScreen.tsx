@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
-import { Criterion, WPMResult } from '../types';
+import { Criterion, CriteriaGroup, WPMResult } from '../types';
 import { CriteriaService } from '../database/services/CriteriaService';
-import { WeightService } from '../database/services/WeightService';
+import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CandidateService } from '../database/services/CandidateService';
 import { WPMCalculator } from '../utils/wpm';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,6 +21,13 @@ interface CandidateResultCardProps {
     criteria: Criterion[];
     onToggle: () => void;
     isExpanded: boolean;
+}
+
+interface GroupResults {
+    group: CriteriaGroup;
+    criteria: Criterion[];
+    results: WPMResult[];
+    status: 'ready' | 'missingCriteria' | 'missingCandidates' | 'invalidWeights';
 }
 
 const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
@@ -94,8 +101,7 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
 
 export default function ResultsScreen({ navigation }: any) {
     const { user } = useAuth();
-    const [results, setResults] = useState<WPMResult[]>([]);
-    const [criteria, setCriteria] = useState<Criterion[]>([]);
+    const [groupResults, setGroupResults] = useState<GroupResults[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -118,36 +124,66 @@ export default function ResultsScreen({ navigation }: any) {
 
         try {
             if (!user) return;
-            const [criteriaData, weightsData, candidatesData] = await Promise.all([
-                CriteriaService.getAll(user.uid),
-                WeightService.getAll(user.uid),
-                CandidateService.getAllWithValues(user.uid),
-            ]);
+            const groups = await CriteriaGroupService.getAll(user.uid);
 
-            if (criteriaData.length === 0) {
-                setError('No criteria configured');
+            if (groups.length === 0) {
+                setError('No criteria groups configured');
                 return;
             }
 
-            if (candidatesData.length === 0) {
-                setError('No candidates added');
-                return;
-            }
+            const resultsByGroup = await Promise.all(
+                groups.map(async (group) => {
+                    const [criteriaData, candidatesData] = await Promise.all([
+                        CriteriaService.getByGroup(user.uid, group.id),
+                        CandidateService.getAllWithValuesByGroup(user.uid, group.id),
+                    ]);
 
-            const isWeightsValid = await WeightService.isValid(user.uid);
-            if (!isWeightsValid) {
-                setError('Weights must total 100%');
-                return;
-            }
+                    if (criteriaData.length === 0) {
+                        return {
+                            group,
+                            criteria: criteriaData,
+                            results: [],
+                            status: 'missingCriteria' as const,
+                        };
+                    }
 
-            const calculatedResults = WPMCalculator.calculateNormalized(
-                candidatesData,
-                criteriaData,
-                weightsData
+                    if (candidatesData.length === 0) {
+                        return {
+                            group,
+                            criteria: criteriaData,
+                            results: [],
+                            status: 'missingCandidates' as const,
+                        };
+                    }
+
+                    const totalWeight = criteriaData.reduce(
+                        (sum, criterion) => sum + (criterion.weight ?? 0),
+                        0
+                    );
+                    if (Math.abs(totalWeight - 100) > 0.01) {
+                        return {
+                            group,
+                            criteria: criteriaData,
+                            results: [],
+                            status: 'invalidWeights' as const,
+                        };
+                    }
+
+                    const calculatedResults = WPMCalculator.calculateNormalized(
+                        candidatesData,
+                        criteriaData
+                    );
+
+                    return {
+                        group,
+                        criteria: criteriaData,
+                        results: calculatedResults,
+                        status: 'ready' as const,
+                    };
+                })
             );
 
-            setResults(calculatedResults);
-            setCriteria(criteriaData);
+            setGroupResults(resultsByGroup);
         } catch (error) {
             console.error('Error loading results:', error);
             setError('Failed to calculate results');
@@ -171,9 +207,8 @@ export default function ResultsScreen({ navigation }: any) {
                     <FontAwesome5 name="exclamation-circle" size={64} color={colors.textTertiary} />
                     <Text style={styles.emptyText}>{error}</Text>
                     <Text style={styles.emptySubtext}>
-                        {error.includes('criteria') && 'Add criteria to get started'}
-                        {error.includes('candidates') && 'Add candidate data to analyze'}
-                        {error.includes('Weights') && 'Set weights to 100% to continue'}
+                        {error.includes('groups') && 'Add a criteria group to get started'}
+                        {error.includes('Failed') && 'Try refreshing the results'}
                     </Text>
                 </View>
             </SafeAreaView>
@@ -193,14 +228,55 @@ export default function ResultsScreen({ navigation }: any) {
                 </View>
             ) : (
                 <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                    {results.map((result) => (
-                        <CandidateResultCard
-                            key={result.candidateId}
-                            result={result}
-                            criteria={criteria}
-                            onToggle={() => toggleExpand(result.candidateId)}
-                            isExpanded={expandedId === result.candidateId}
-                        />
+                    {groupResults.map((groupResult) => (
+                        <View key={groupResult.group.id} style={styles.groupCard}>
+                            <View style={styles.groupHeader}>
+                                <View>
+                                    <Text style={styles.groupTitle}>{groupResult.group.name}</Text>
+                                    <Text style={styles.groupSubtitle}>
+                                        {groupResult.criteria.length} criteria
+                                    </Text>
+                                </View>
+                                <View style={styles.groupStatus}>
+                                    <FontAwesome5
+                                        name={
+                                            groupResult.status === 'ready'
+                                                ? 'check-circle'
+                                                : 'exclamation-circle'
+                                        }
+                                        size={18}
+                                        color={
+                                            groupResult.status === 'ready'
+                                                ? colors.success
+                                                : colors.warning
+                                        }
+                                    />
+                                </View>
+                            </View>
+
+                            {groupResult.status !== 'ready' ? (
+                                <View style={styles.groupMessage}>
+                                    <Text style={styles.groupMessageText}>
+                                        {groupResult.status === 'missingCriteria' &&
+                                            'Tambahkan criteria untuk grup ini.'}
+                                        {groupResult.status === 'missingCandidates' &&
+                                            'Tambahkan data kandidat untuk grup ini.'}
+                                        {groupResult.status === 'invalidWeights' &&
+                                            'Total bobot harus 100%.'}
+                                    </Text>
+                                </View>
+                            ) : (
+                                groupResult.results.map((result) => (
+                                    <CandidateResultCard
+                                        key={result.candidateId}
+                                        result={result}
+                                        criteria={groupResult.criteria}
+                                        onToggle={() => toggleExpand(result.candidateId)}
+                                        isExpanded={expandedId === result.candidateId}
+                                    />
+                                ))
+                            )}
+                        </View>
                     ))}
                 </ScrollView>
             )}
@@ -238,6 +314,53 @@ const styles = StyleSheet.create({
     content: {
         padding: spacing.lg,
         paddingTop: 0,
+    },
+
+    groupCard: {
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.lg,
+        padding: spacing.lg,
+        marginBottom: spacing.lg,
+        ...shadows.sm,
+    },
+
+    groupHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+
+    groupTitle: {
+        fontSize: typography.lg,
+        fontWeight: typography.semibold,
+        color: colors.textPrimary,
+    },
+
+    groupSubtitle: {
+        fontSize: typography.sm,
+        color: colors.textSecondary,
+        marginTop: spacing.xs,
+    },
+
+    groupStatus: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.background,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    groupMessage: {
+        backgroundColor: colors.background,
+        borderRadius: borderRadius.md,
+        padding: spacing.md,
+    },
+
+    groupMessageText: {
+        fontSize: typography.sm,
+        color: colors.textSecondary,
     },
 
     resultCard: {

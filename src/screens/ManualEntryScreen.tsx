@@ -21,10 +21,11 @@ import { CandidateService } from '../database/services/CandidateService';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ManualEntryScreen({ route, navigation }: any) {
-    const { candidateId, mode } = route.params || { mode: 'add' };
+    const { candidateId, mode, groupId: routeGroupId } = route.params || { mode: 'add' };
     const isEditMode = mode === 'edit';
     const { user } = useAuth();
 
+    const [groupId, setGroupId] = useState<string | null>(routeGroupId ?? null);
     const [name, setName] = useState('');
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [criteria, setCriteria] = useState<Criterion[]>([]);
@@ -32,8 +33,10 @@ export default function ManualEntryScreen({ route, navigation }: any) {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        loadCriteria();
-    }, []);
+        if (groupId) {
+            loadCriteria(groupId);
+        }
+    }, [groupId]);
 
     useEffect(() => {
         if (isEditMode && candidateId) {
@@ -41,10 +44,10 @@ export default function ManualEntryScreen({ route, navigation }: any) {
         }
     }, [candidateId]);
 
-    const loadCriteria = async () => {
+    const loadCriteria = async (activeGroupId: string) => {
         if (!user) return;
         try {
-            const data = await CriteriaService.getAll(user.uid);
+            const data = await CriteriaService.getByGroup(user.uid, activeGroupId);
             setCriteria(data);
 
             // Initialize values with defaults
@@ -65,6 +68,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
             if (candidate) {
                 setName(candidate.name);
                 setImageUri(candidate.imageUri ?? null);
+                setGroupId(candidate.groupId);
 
                 const candidateValues: { [key: string]: number } = {};
                 candidate.values.forEach((v) => {
@@ -79,6 +83,10 @@ export default function ManualEntryScreen({ route, navigation }: any) {
 
     const handleSave = async () => {
         if (!user) return;
+        if (!groupId) {
+            Alert.alert('Error', 'Please select a criteria group first');
+            return;
+        }
         if (!name.trim()) {
             Alert.alert('Error', 'Please enter a candidate name');
             return;
@@ -100,9 +108,22 @@ export default function ManualEntryScreen({ route, navigation }: any) {
             }));
 
             if (isEditMode) {
-                await CandidateService.update(user.uid, candidateId, name.trim(), valuesList, imageUri);
+                await CandidateService.update(
+                    user.uid,
+                    candidateId,
+                    groupId,
+                    name.trim(),
+                    valuesList,
+                    imageUri
+                );
             } else {
-                await CandidateService.create(user.uid, name.trim(), valuesList, imageUri);
+                await CandidateService.create(
+                    user.uid,
+                    groupId,
+                    name.trim(),
+                    valuesList,
+                    imageUri
+                );
             }
 
             navigation.goBack();

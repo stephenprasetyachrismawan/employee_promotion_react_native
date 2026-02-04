@@ -8,11 +8,11 @@ import {
     deleteDoc,
     query,
     orderBy,
+    where,
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { Criterion, DataType, ImpactType } from '../../types';
-import { WeightService } from './WeightService';
 
 export class CriteriaService {
     private static getCollectionRef(userId: string) {
@@ -25,9 +25,30 @@ export class CriteriaService {
 
         return snapshot.docs.map(doc => ({
             id: doc.id,
+            groupId: doc.data().groupId ?? '',
             name: doc.data().name,
             dataType: doc.data().dataType,
             impactType: doc.data().impactType,
+            weight: doc.data().weight ?? 0,
+            createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
+        }));
+    }
+
+    static async getByGroup(userId: string, groupId: string): Promise<Criterion[]> {
+        const q = query(
+            this.getCollectionRef(userId),
+            where('groupId', '==', groupId),
+            orderBy('createdAt', 'asc')
+        );
+        const snapshot = await getDocs(q);
+
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            groupId: doc.data().groupId ?? '',
+            name: doc.data().name,
+            dataType: doc.data().dataType,
+            impactType: doc.data().impactType,
+            weight: doc.data().weight ?? 0,
             createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         }));
     }
@@ -42,28 +63,31 @@ export class CriteriaService {
 
         return {
             id: docSnap.id,
+            groupId: docSnap.data().groupId ?? '',
             name: docSnap.data().name,
             dataType: docSnap.data().dataType,
             impactType: docSnap.data().impactType,
+            weight: docSnap.data().weight ?? 0,
             createdAt: docSnap.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         };
     }
 
     static async create(
         userId: string,
+        groupId: string,
         name: string,
         dataType: DataType,
-        impactType: ImpactType
+        impactType: ImpactType,
+        weight: number
     ): Promise<string> {
         const docRef = await addDoc(this.getCollectionRef(userId), {
+            groupId,
             name,
             dataType,
             impactType,
+            weight,
             createdAt: Timestamp.now(),
         });
-
-        // Create corresponding weight entry
-        await WeightService.create(userId, docRef.id);
 
         return docRef.id;
     }
@@ -73,13 +97,15 @@ export class CriteriaService {
         id: string,
         name: string,
         dataType: DataType,
-        impactType: ImpactType
+        impactType: ImpactType,
+        weight: number
     ): Promise<void> {
         const docRef = doc(this.getCollectionRef(userId), id);
         await updateDoc(docRef, {
             name,
             dataType,
             impactType,
+            weight,
         });
     }
 
@@ -88,15 +114,18 @@ export class CriteriaService {
         const docRef = doc(this.getCollectionRef(userId), id);
         await deleteDoc(docRef);
 
-        // Delete associated weight
-        await WeightService.delete(userId, id);
-
         // Note: Candidate values will be orphaned but that's okay for now
         // In production, you might want to clean those up too
     }
 
     static async count(userId: string): Promise<number> {
         const snapshot = await getDocs(this.getCollectionRef(userId));
+        return snapshot.size;
+    }
+
+    static async countByGroup(userId: string, groupId: string): Promise<number> {
+        const q = query(this.getCollectionRef(userId), where('groupId', '==', groupId));
+        const snapshot = await getDocs(q);
         return snapshot.size;
     }
 }
