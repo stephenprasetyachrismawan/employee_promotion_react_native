@@ -12,14 +12,15 @@ import { colors, typography, spacing, borderRadius, shadows } from '../styles/th
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { CriteriaService } from '../database/services/CriteriaService';
-import { WeightService } from '../database/services/WeightService';
+import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CandidateService } from '../database/services/CandidateService';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function HomeScreen({ navigation }: any) {
     const { user } = useAuth();
+    const [groupCount, setGroupCount] = useState(0);
     const [criteriaCount, setCriteriaCount] = useState(0);
-    const [weightsValid, setWeightsValid] = useState(false);
+    const [readyGroups, setReadyGroups] = useState(0);
     const [candidateCount, setCandidateCount] = useState(0);
     const [loading, setLoading] = useState(true);
 
@@ -39,15 +40,37 @@ export default function HomeScreen({ navigation }: any) {
         if (!user) return;
 
         try {
-            const [criteria, weights, candidates] = await Promise.all([
-                CriteriaService.count(user.uid),
-                WeightService.isValid(user.uid),
-                CandidateService.getAll(user.uid).then(c => c.length),
-            ]);
+            const groups = await CriteriaGroupService.getAll(user.uid);
+            const counts = await Promise.all(
+                groups.map(async (group) => {
+                    const [criteria, candidates] = await Promise.all([
+                        CriteriaService.getByGroup(user.uid, group.id),
+                        CandidateService.getAllByGroup(user.uid, group.id),
+                    ]);
+                    const totalWeight = criteria.reduce(
+                        (sum, criterion) => sum + (criterion.weight ?? 0),
+                        0
+                    );
+                    const isReady =
+                        criteria.length > 0 &&
+                        candidates.length > 0 &&
+                        Math.abs(totalWeight - 100) < 0.01;
+                    return {
+                        criteriaCount: criteria.length,
+                        candidateCount: candidates.length,
+                        isReady,
+                    };
+                })
+            );
 
-            setCriteriaCount(criteria);
-            setWeightsValid(weights);
-            setCandidateCount(candidates);
+            const totalCriteria = counts.reduce((sum, item) => sum + item.criteriaCount, 0);
+            const totalCandidates = counts.reduce((sum, item) => sum + item.candidateCount, 0);
+            const readyCount = counts.filter(item => item.isReady).length;
+
+            setGroupCount(groups.length);
+            setCriteriaCount(totalCriteria);
+            setCandidateCount(totalCandidates);
+            setReadyGroups(readyCount);
         } catch (error) {
             console.error('Error loading status:', error);
         } finally {
@@ -55,7 +78,7 @@ export default function HomeScreen({ navigation }: any) {
         }
     };
 
-    const isReadyToAnalyze = criteriaCount > 0 && weightsValid && candidateCount > 0;
+    const isReadyToAnalyze = readyGroups > 0;
 
     return (
         <SafeAreaView style={styles.container}>
@@ -84,9 +107,10 @@ export default function HomeScreen({ navigation }: any) {
                             </View>
                         </View>
                         <Text style={styles.statusCardTitle}>Configure Criteria</Text>
-                        <Text style={styles.statusCardSubtitle}>Set up your KPIs and metrics</Text>
+                        <Text style={styles.statusCardSubtitle}>Create groups and criteria</Text>
                         <Text style={styles.statusCardInfo}>
-                            {criteriaCount} {criteriaCount === 1 ? 'criterion' : 'criteria'} configured
+                            {groupCount} {groupCount === 1 ? 'group' : 'groups'} • {criteriaCount}{' '}
+                            {criteriaCount === 1 ? 'criterion' : 'criteria'}
                         </Text>
                     </TouchableOpacity>
 
@@ -124,8 +148,8 @@ export default function HomeScreen({ navigation }: any) {
                     />
                     {!isReadyToAnalyze && (
                         <Text style={styles.warningText}>
-                            {criteriaCount === 0 && '• Configure criteria first\n'}
-                            {!weightsValid && '• Set weights to 100%\n'}
+                            {groupCount === 0 && '• Create a criteria group first\n'}
+                            {readyGroups === 0 && groupCount > 0 && '• Ensure one group has 100% weight\n'}
                             {candidateCount === 0 && '• Add candidate data'}
                         </Text>
                     )}

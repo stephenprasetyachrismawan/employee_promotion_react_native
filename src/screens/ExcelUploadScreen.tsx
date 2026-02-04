@@ -18,7 +18,8 @@ import { CandidateService } from '../database/services/CandidateService';
 import { ExcelHandler } from '../utils/excelHandler';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function ExcelUploadScreen({ navigation }: any) {
+export default function ExcelUploadScreen({ route, navigation }: any) {
+    const { groupId } = route.params || {};
     const { user } = useAuth();
     const [selectedFile, setSelectedFile] = useState<any>(null);
     const [previewData, setPreviewData] = useState<any[]>([]);
@@ -57,7 +58,11 @@ export default function ExcelUploadScreen({ navigation }: any) {
         setLoading(true);
         try {
             if (!user) return;
-            const criteria = await CriteriaService.getAll(user.uid);
+            if (!groupId) {
+                Alert.alert('No Group', 'Please select a criteria group first');
+                return;
+            }
+            const criteria = await CriteriaService.getByGroup(user.uid, groupId);
             const { candidates, errors: parseErrors } = await ExcelHandler.parseExcelFile(
                 source,
                 criteria
@@ -81,7 +86,7 @@ export default function ExcelUploadScreen({ navigation }: any) {
     };
 
     const handleImport = async () => {
-        if (!user) return;
+        if (!user || !groupId) return;
         if (previewData.length === 0) {
             Alert.alert('No Data', 'No valid candidates to import');
             return;
@@ -99,7 +104,7 @@ export default function ExcelUploadScreen({ navigation }: any) {
         setLoading(true);
         try {
             for (const candidate of previewData) {
-                await CandidateService.create(user.uid, candidate.name, candidate.values);
+                await CandidateService.create(user.uid, groupId, candidate.name, candidate.values);
             }
 
             Alert.alert(

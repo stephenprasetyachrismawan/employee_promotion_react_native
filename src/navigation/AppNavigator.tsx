@@ -13,7 +13,6 @@ import LoginScreen from '../screens/auth/LoginScreen';
 // Main Screens
 import HomeScreen from '../screens/HomeScreen';
 import CriteriaNavigator from './CriteriaNavigator';
-import WeightDistributionScreen from '../screens/WeightDistributionScreen';
 import InputDataNavigator from './InputDataNavigator';
 import ResultsScreen from '../screens/ResultsScreen';
 
@@ -31,8 +30,6 @@ function MainTabs() {
                         iconName = 'home';
                     } else if (route.name === 'Criteria') {
                         iconName = 'list';
-                    } else if (route.name === 'Weights') {
-                        iconName = 'balance-scale';
                     } else if (route.name === 'Input') {
                         iconName = 'edit';
                     } else if (route.name === 'Results') {
@@ -52,7 +49,6 @@ function MainTabs() {
         >
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Criteria" component={CriteriaNavigator} />
-            <Tab.Screen name="Weights" component={WeightDistributionScreen} />
             <Tab.Screen name="Input" component={InputDataNavigator} />
             <Tab.Screen name="Results" component={ResultsScreen} />
         </Tab.Navigator>
