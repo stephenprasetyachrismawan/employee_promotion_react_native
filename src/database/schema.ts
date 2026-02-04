@@ -1,0 +1,48 @@
+// Database schema definitions
+
+export const CREATE_CRITERIA_TABLE = `
+  CREATE TABLE IF NOT EXISTS criteria (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    dataType TEXT NOT NULL CHECK(dataType IN ('NUMERIC', 'SCALE')),
+    impactType TEXT NOT NULL CHECK(impactType IN ('BENEFIT', 'COST')),
+    isActive INTEGER NOT NULL DEFAULT 1
+  );
+`;
+
+export const CREATE_WEIGHTS_TABLE = `
+  CREATE TABLE IF NOT EXISTS weights (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    criterionId INTEGER NOT NULL,
+    weight REAL NOT NULL DEFAULT 0,
+    isLocked INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (criterionId) REFERENCES criteria(id) ON DELETE CASCADE
+  );
+`;
+
+export const CREATE_CANDIDATES_TABLE = `
+  CREATE TABLE IF NOT EXISTS candidates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+  );
+`;
+
+export const CREATE_CANDIDATE_VALUES_TABLE = `
+  CREATE TABLE IF NOT EXISTS candidate_values (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    candidateId INTEGER NOT NULL,
+    criterionId INTEGER NOT NULL,
+    value REAL NOT NULL,
+    FOREIGN KEY (candidateId) REFERENCES candidates(id) ON DELETE CASCADE,
+    FOREIGN KEY (criterionId) REFERENCES criteria(id) ON DELETE CASCADE,
+    UNIQUE(candidateId, criterionId)
+  );
+`;
+
+export const ALL_TABLES = [
+    CREATE_CRITERIA_TABLE,
+    CREATE_WEIGHTS_TABLE,
+    CREATE_CANDIDATES_TABLE,
+    CREATE_CANDIDATE_VALUES_TABLE,
+];
