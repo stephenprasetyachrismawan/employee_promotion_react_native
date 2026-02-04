@@ -53,6 +53,32 @@ export class CriteriaService {
         }));
     }
 
+    static async getByGroup(userId: string, groupId: string): Promise<Criterion[]> {
+        try {
+            const q = query(
+                this.getCollectionRef(userId),
+                where('groupId', '==', groupId)
+            );
+            const snapshot = await getDocs(q);
+
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                groupId: doc.data().groupId ?? '',
+                name: doc.data().name,
+                dataType: doc.data().dataType,
+                impactType: doc.data().impactType,
+                weight: doc.data().weight ?? 0,
+                createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
+            }));
+        } catch (error) {
+            console.warn('Failed to query criteria by group, falling back to client filter.', error);
+            const allCriteria = await this.getAll(userId);
+            return allCriteria
+                .filter((criterion) => criterion.groupId === groupId)
+                .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        }
+    }
+
     static async getById(userId: string, id: string): Promise<Criterion | null> {
         const docRef = doc(this.getCollectionRef(userId), id);
         const docSnap = await getDoc(docRef);
