@@ -10,13 +10,15 @@ import {
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
-import { Criterion } from '../types';
+import { CriteriaGroup } from '../types';
+import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function CriteriaListScreen({ navigation }: any) {
     const { user } = useAuth();
-    const [criteria, setCriteria] = useState<Criterion[]>([]);
+    const [groups, setGroups] = useState<CriteriaGroup[]>([]);
+    const [criteriaCounts, setCriteriaCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -35,10 +37,21 @@ export default function CriteriaListScreen({ navigation }: any) {
         if (!user) return;
 
         try {
-            const data = await CriteriaService.getAll(user.uid);
-            setCriteria(data);
+            const data = await CriteriaGroupService.getAll(user.uid);
+            setGroups(data);
+            const counts = await Promise.all(
+                data.map(async (group) => ({
+                    groupId: group.id,
+                    count: await CriteriaService.countByGroup(user.uid, group.id),
+                }))
+            );
+            const countMap = counts.reduce<Record<string, number>>((acc, item) => {
+                acc[item.groupId] = item.count;
+                return acc;
+            }, {});
+            setCriteriaCounts(countMap);
         } catch (error) {
-            console.error('Error loading criteria:', error);
+            console.error('Error loading criteria groups:', error);
         } finally {
             setLoading(false);
         }
@@ -48,8 +61,8 @@ export default function CriteriaListScreen({ navigation }: any) {
         if (!user) return;
 
         Alert.alert(
-            'Delete Criterion',
-            `Are you sure you want to delete "${name}"?`,
+            'Delete Criteria Group',
+            `Are you sure you want to delete "${name}"? This will remove all criteria and data in this group.`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -57,10 +70,10 @@ export default function CriteriaListScreen({ navigation }: any) {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await CriteriaService.delete(user.uid, id);
+                            await CriteriaGroupService.delete(user.uid, id);
                             loadCriteria();
                         } catch (error) {
-                            console.error('Error deleting criterion:', error);
+                            console.error('Error deleting criteria group:', error);
                         }
                     },
                 },
@@ -68,35 +81,31 @@ export default function CriteriaListScreen({ navigation }: any) {
         );
     };
 
-    const renderCriterion = ({ item }: { item: Criterion }) => {
-        const isBenefit = item.impactType === 'BENEFIT';
-        const iconColor = isBenefit ? colors.benefit : colors.cost;
+    const renderGroup = ({ item }: { item: CriteriaGroup }) => {
+        const count = criteriaCounts[item.id] ?? 0;
 
         return (
-            <View style={styles.criterionCard}>
-                <View style={styles.criterionContent}>
-                    <View style={[styles.iconContainer, { backgroundColor: iconColor + '20' }]}>
-                        <FontAwesome5
-                            name={isBenefit ? 'arrow-up' : 'arrow-down'}
-                            size={24}
-                            color={iconColor}
-                        />
+            <TouchableOpacity
+                style={styles.groupCard}
+                onPress={() => navigation.navigate('CriteriaGroupDetail', { groupId: item.id })}
+            >
+                <View style={styles.groupContent}>
+                    <View style={styles.iconContainer}>
+                        <FontAwesome5 name="layer-group" size={24} color={colors.primary} />
                     </View>
-                    <View style={styles.criterionInfo}>
-                        <Text style={styles.criterionName}>{item.name}</Text>
-                        <View style={styles.criterionMeta}>
-                            <Text style={styles.metaText}>{item.impactType}</Text>
-                            <Text style={styles.metaSeparator}>•</Text>
-                            <Text style={styles.metaText}>{item.dataType}</Text>
-                        </View>
+                    <View style={styles.groupInfo}>
+                        <Text style={styles.groupName}>{item.name}</Text>
+                        <Text style={styles.groupMeta}>
+                            {count} {count === 1 ? 'criterion' : 'criteria'}
+                        </Text>
                     </View>
                 </View>
                 <View style={styles.actions}>
                     <TouchableOpacity
                         style={styles.actionButton}
                         onPress={() =>
-                            navigation.navigate('CriterionForm', {
-                                criterionId: item.id,
+                            navigation.navigate('CriteriaGroupForm', {
+                                groupId: item.id,
                                 mode: 'edit',
                             })
                         }
@@ -110,29 +119,29 @@ export default function CriteriaListScreen({ navigation }: any) {
                         <FontAwesome5 name="trash" size={20} color={colors.error} />
                     </TouchableOpacity>
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Criteria</Text>
-                <Text style={styles.subtitle}>Define metrics and score types.</Text>
+                <Text style={styles.title}>Criteria Groups</Text>
+                <Text style={styles.subtitle}>Group criteria and manage weights.</Text>
             </View>
 
-            {criteria.length === 0 && !loading ? (
+            {groups.length === 0 && !loading ? (
                 <View style={styles.emptyState}>
-                    <FontAwesome5 name="list" size={64} color={colors.textTertiary} />
-                    <Text style={styles.emptyText}>No criteria yet</Text>
+                    <FontAwesome5 name="layer-group" size={64} color={colors.textTertiary} />
+                    <Text style={styles.emptyText}>No criteria groups yet</Text>
                     <Text style={styles.emptySubtext}>
-                        Add criteria to start evaluating candidates
+                        Add a group to organize your criteria
                     </Text>
                 </View>
             ) : (
                 <FlatList
-                    data={criteria}
-                    renderItem={renderCriterion}
+                    data={groups}
+                    renderItem={renderGroup}
                     keyExtractor={(item) => item.id.toString()}
                     contentContainerStyle={styles.list}
                 />
@@ -140,7 +149,7 @@ export default function CriteriaListScreen({ navigation }: any) {
 
             <TouchableOpacity
                 style={styles.fab}
-                onPress={() => navigation.navigate('CriterionForm', { mode: 'add' })}
+                onPress={() => navigation.navigate('CriteriaGroupForm', { mode: 'add' })}
             >
                 <FontAwesome5 name="plus" size={28} color={colors.surface} />
             </TouchableOpacity>
@@ -176,7 +185,7 @@ const styles = StyleSheet.create({
         paddingTop: 0,
     },
 
-    criterionCard: {
+    groupCard: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -187,7 +196,7 @@ const styles = StyleSheet.create({
         ...shadows.sm,
     },
 
-    criterionContent: {
+    groupContent: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
@@ -200,33 +209,23 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: spacing.md,
+        backgroundColor: colors.primary + '15',
     },
 
-    criterionInfo: {
+    groupInfo: {
         flex: 1,
     },
 
-    criterionName: {
+    groupName: {
         fontSize: typography.base,
         fontWeight: typography.semibold,
         color: colors.textPrimary,
         marginBottom: spacing.xs,
     },
 
-    criterionMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-
-    metaText: {
+    groupMeta: {
         fontSize: typography.sm,
         color: colors.textSecondary,
-    },
-
-    metaSeparator: {
-        fontSize: typography.sm,
-        color: colors.textTertiary,
-        marginHorizontal: spacing.xs,
     },
 
     actions: {

@@ -12,15 +12,18 @@ import {
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
 import { Button } from '../components/common/Button';
-import { Candidate } from '../types';
+import { Candidate, CriteriaGroup } from '../types';
 import { CandidateService } from '../database/services/CandidateService';
 import { CriteriaService } from '../database/services/CriteriaService';
+import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { ExcelHandler } from '../utils/excelHandler';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function InputDataScreen({ navigation }: any) {
     const { user } = useAuth();
     const [candidates, setCandidates] = useState<Candidate[]>([]);
+    const [groups, setGroups] = useState<CriteriaGroup[]>([]);
+    const [selectedGroup, setSelectedGroup] = useState<CriteriaGroup | null>(null);
     const [loading, setLoading] = useState(true);
     const [criteriaCount, setCriteriaCount] = useState(0);
 
@@ -39,12 +42,23 @@ export default function InputDataScreen({ navigation }: any) {
     const loadData = async () => {
         if (!user) return;
         try {
-            const [candidatesData, count] = await Promise.all([
-                CandidateService.getAll(user.uid),
-                CriteriaService.count(user.uid),
-            ]);
-            setCandidates(candidatesData);
-            setCriteriaCount(count);
+            const groupsData = await CriteriaGroupService.getAll(user.uid);
+            setGroups(groupsData);
+
+            const activeGroup = selectedGroup ?? groupsData[0] ?? null;
+            setSelectedGroup(activeGroup);
+
+            if (activeGroup) {
+                const [candidatesData, count] = await Promise.all([
+                    CandidateService.getAllByGroup(user.uid, activeGroup.id),
+                    CriteriaService.countByGroup(user.uid, activeGroup.id),
+                ]);
+                setCandidates(candidatesData);
+                setCriteriaCount(count);
+            } else {
+                setCandidates([]);
+                setCriteriaCount(0);
+            }
         } catch (error) {
             console.error('Error loading data:', error);
         } finally {
@@ -78,7 +92,11 @@ export default function InputDataScreen({ navigation }: any) {
     const handleDownloadTemplate = async () => {
         if (!user) return;
         try {
-            const criteria = await CriteriaService.getAll(user.uid);
+            if (!selectedGroup) {
+                Alert.alert('No Group', 'Please select a criteria group first');
+                return;
+            }
+            const criteria = await CriteriaService.getByGroup(user.uid, selectedGroup.id);
             if (criteria.length === 0) {
                 Alert.alert('No Criteria', 'Please add criteria first before downloading template');
                 return;
@@ -114,6 +132,7 @@ export default function InputDataScreen({ navigation }: any) {
                         navigation.navigate('ManualEntry', {
                             candidateId: item.id,
                             mode: 'edit',
+                            groupId: item.groupId,
                         })
                     }
                 >
@@ -129,25 +148,6 @@ export default function InputDataScreen({ navigation }: any) {
         </View>
     );
 
-    if (criteriaCount === 0) {
-        return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.emptyState}>
-                    <FontAwesome5 name="users" size={64} color={colors.textTertiary} />
-                    <Text style={styles.emptyText}>No criteria configured</Text>
-                    <Text style={styles.emptySubtext}>
-                        Add criteria first before adding candidate data
-                    </Text>
-                    <Button
-                        title="Go to Criteria"
-                        onPress={() => navigation.navigate('Criteria')}
-                        style={styles.emptyButton}
-                    />
-                </View>
-            </SafeAreaView>
-        );
-    }
-
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -155,10 +155,70 @@ export default function InputDataScreen({ navigation }: any) {
                 <Text style={styles.subtitle}>Upload Excel or enter manually</Text>
             </View>
 
+            <View style={styles.groupSection}>
+                <Text style={styles.sectionLabel}>Pilih Kelompok Kriteria</Text>
+                {groups.length === 0 ? (
+                    <View style={styles.emptyGroupCard}>
+                        <Text style={styles.emptyGroupText}>
+                            Belum ada kelompok. Tambahkan di menu Criteria.
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={groups}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.groupList}
+                        renderItem={({ item }) => {
+                            const isActive = selectedGroup?.id === item.id;
+                            return (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.groupCard,
+                                        isActive && styles.groupCardActive,
+                                    ]}
+                                    onPress={() => {
+                                        setSelectedGroup(item);
+                                        setLoading(true);
+                                        CandidateService.getAllByGroup(user.uid, item.id)
+                                            .then(setCandidates)
+                                            .catch((error) =>
+                                                console.error('Error loading candidates:', error)
+                                            )
+                                            .finally(() => setLoading(false));
+                                        CriteriaService.countByGroup(user.uid, item.id)
+                                            .then(setCriteriaCount)
+                                            .catch((error) =>
+                                                console.error('Error loading criteria count:', error)
+                                            );
+                                    }}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.groupCardTitle,
+                                            isActive && styles.groupCardTitleActive,
+                                        ]}
+                                    >
+                                        {item.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        }}
+                    />
+                )}
+            </View>
+
             <View style={styles.actionCards}>
                 <TouchableOpacity
                     style={styles.actionCard}
-                    onPress={() => navigation.navigate('ManualEntry', { mode: 'add' })}
+                    onPress={() =>
+                        navigation.navigate('ManualEntry', {
+                            mode: 'add',
+                            groupId: selectedGroup?.id,
+                        })
+                    }
+                    disabled={!selectedGroup}
                 >
                     <View style={[styles.actionIconContainer, { backgroundColor: colors.primary + '20' }]}>
                         <FontAwesome5 name="edit" size={28} color={colors.primary} />
@@ -169,7 +229,10 @@ export default function InputDataScreen({ navigation }: any) {
 
                 <TouchableOpacity
                     style={styles.actionCard}
-                    onPress={() => navigation.navigate('ExcelUpload')}
+                    onPress={() =>
+                        navigation.navigate('ExcelUpload', { groupId: selectedGroup?.id })
+                    }
+                    disabled={!selectedGroup}
                 >
                     <View style={[styles.actionIconContainer, { backgroundColor: colors.benefit + '20' }]}>
                         <FontAwesome5 name="cloud-upload-alt" size={28} color={colors.benefit} />
@@ -185,14 +248,30 @@ export default function InputDataScreen({ navigation }: any) {
                     onPress={handleDownloadTemplate}
                     variant="outline"
                     style={styles.templateButton}
+                    disabled={!selectedGroup}
                 />
             </View>
 
             <View style={styles.listHeader}>
-                <Text style={styles.listTitle}>Candidates ({candidates.length})</Text>
+                <Text style={styles.listTitle}>
+                    {selectedGroup ? `${selectedGroup.name} • ` : ''}Candidates ({candidates.length})
+                </Text>
             </View>
 
-            {candidates.length === 0 ? (
+            {selectedGroup && criteriaCount === 0 ? (
+                <View style={styles.emptyState}>
+                    <FontAwesome5 name="users" size={64} color={colors.textTertiary} />
+                    <Text style={styles.emptyText}>No criteria configured</Text>
+                    <Text style={styles.emptySubtext}>
+                        Add criteria first before adding candidate data
+                    </Text>
+                    <Button
+                        title="Go to Criteria"
+                        onPress={() => navigation.navigate('Criteria')}
+                        style={styles.emptyButton}
+                    />
+                </View>
+            ) : candidates.length === 0 ? (
                 <View style={styles.emptyList}>
                     <Text style={styles.emptyListText}>No candidates yet</Text>
                 </View>
@@ -229,6 +308,61 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: typography.base,
         color: colors.textSecondary,
+    },
+
+    groupSection: {
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.md,
+    },
+
+    sectionLabel: {
+        fontSize: typography.sm,
+        fontWeight: typography.semibold,
+        color: colors.textSecondary,
+        marginBottom: spacing.sm,
+    },
+
+    groupList: {
+        paddingVertical: spacing.xs,
+        gap: spacing.sm,
+    },
+
+    groupCard: {
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.lg,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+
+    groupCardActive: {
+        backgroundColor: colors.primary + '15',
+        borderColor: colors.primary,
+    },
+
+    groupCardTitle: {
+        fontSize: typography.sm,
+        color: colors.textSecondary,
+        fontWeight: typography.medium,
+    },
+
+    groupCardTitleActive: {
+        color: colors.primary,
+        fontWeight: typography.semibold,
+    },
+
+    emptyGroupCard: {
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+
+    emptyGroupText: {
+        fontSize: typography.sm,
+        color: colors.textTertiary,
     },
 
     actionCards: {
