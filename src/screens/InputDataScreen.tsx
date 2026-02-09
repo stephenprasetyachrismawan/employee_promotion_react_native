@@ -6,7 +6,6 @@ import {
     FlatList,
     TouchableOpacity,
     SafeAreaView,
-    Alert,
     Image,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
@@ -18,6 +17,11 @@ import { CriteriaService } from '../database/services/CriteriaService';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { ExcelHandler } from '../utils/excelHandler';
 import { useAuth } from '../contexts/AuthContext';
+import { confirmDialog, showAlert } from '../utils/dialog';
+import {
+    deleteGroupWithConfirmation,
+    duplicateGroupWithConfirmation,
+} from '../services/groupActions';
 
 export default function InputDataScreen({ navigation }: any) {
     const { user } = useAuth();
@@ -70,74 +74,52 @@ export default function InputDataScreen({ navigation }: any) {
         }
     };
 
-    const handleDelete = (id: string, name: string) => {
+    const handleDelete = async (id: string, name: string) => {
         if (!user) return;
-        Alert.alert(
-            'Delete Candidate',
-            `Are you sure you want to delete "${name}"?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await CandidateService.delete(user.uid, id);
-                            await loadData();
-                        } catch (error) {
-                            console.error('Error deleting candidate:', error);
-                        }
-                    },
-                },
-            ]
-        );
+
+        const confirmed = await confirmDialog({
+            title: 'Delete Candidate',
+            message: `Are you sure you want to delete "${name}"?`,
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            destructive: true,
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await CandidateService.delete(user.uid, id);
+            await loadData();
+        } catch (error) {
+            console.error('Error deleting candidate:', error);
+            showAlert('Error', 'Failed to delete candidate');
+        }
     };
 
-    const handleDeleteGroup = (id: string, name: string) => {
+    const handleDeleteGroup = async (id: string, name: string) => {
         if (!user) return;
-
-        Alert.alert(
-            'Delete Input Group',
-            `Hapus grup "${name}" beserta semua data di dalamnya?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await CriteriaGroupService.delete(user.uid, id);
-                            await loadData();
-                        } catch (error) {
-                            console.error('Error deleting group:', error);
-                        }
-                    },
-                },
-            ]
-        );
+        await deleteGroupWithConfirmation({
+            userId: user.uid,
+            groupId: id,
+            groupName: name,
+            groupType: 'input',
+            onDeleted: loadData,
+        });
     };
 
-    const handleDuplicateGroup = (id: string, name: string) => {
+    const handleDuplicateGroup = async (id: string, name: string) => {
         if (!user) return;
-
-        Alert.alert(
-            'Duplicate Input Group',
-            `Duplikat grup "${name}" beserta kriteria?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Duplicate',
-                    onPress: async () => {
-                        try {
-                            const newGroupId = await CriteriaGroupService.duplicate(user.uid, id);
-                            await loadData(newGroupId);
-                        } catch (error) {
-                            console.error('Error duplicating group:', error);
-                        }
-                    },
-                },
-            ]
-        );
+        await duplicateGroupWithConfirmation({
+            userId: user.uid,
+            groupId: id,
+            groupName: name,
+            groupType: 'input',
+            onDuplicated: async (newGroupId) => {
+                await loadData(newGroupId);
+            },
+        });
     };
 
     const methodBadgeStyle = (method: string) =>
@@ -147,18 +129,18 @@ export default function InputDataScreen({ navigation }: any) {
         if (!user) return;
         try {
             if (!selectedGroup) {
-                Alert.alert('No Group', 'Please select a criteria group first');
+                showAlert('No Group', 'Please select a criteria group first');
                 return;
             }
             const criteria = await CriteriaService.getByGroup(user.uid, selectedGroup.id);
             if (criteria.length === 0) {
-                Alert.alert('No Criteria', 'Please add criteria first before downloading template');
+                showAlert('No Criteria', 'Please add criteria first before downloading template');
                 return;
             }
             await ExcelHandler.generateTemplate(criteria);
         } catch (error) {
             console.error('Error downloading template:', error);
-            Alert.alert('Error', 'Failed to generate template');
+            showAlert('Error', 'Failed to generate template');
         }
     };
 
@@ -245,6 +227,7 @@ export default function InputDataScreen({ navigation }: any) {
                                     <TouchableOpacity
                                         style={styles.groupCardHeader}
                                         onPress={() => {
+                                            if (!user) return;
                                             setSelectedGroup(item);
                                             setLoading(true);
                                             CandidateService.getAllByGroup(user.uid, item.id)

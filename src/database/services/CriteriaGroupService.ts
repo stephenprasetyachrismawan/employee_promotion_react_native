@@ -10,12 +10,16 @@ import {
     orderBy,
     where,
     Timestamp,
+    DocumentReference,
+    writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { CriteriaGroup, DecisionMethod } from '../../types';
 import { CriteriaService } from './CriteriaService';
 
 export class CriteriaGroupService {
+    private static readonly BATCH_CHUNK_SIZE = 450;
+
     private static getCollectionRef(userId: string) {
         return collection(db, 'users', userId, 'criteriaGroups');
     }
@@ -30,6 +34,26 @@ export class CriteriaGroupService {
 
     private static getCandidateValuesRef(userId: string) {
         return collection(db, 'users', userId, 'candidateValues');
+    }
+
+    private static async deleteInBatches(docRefs: DocumentReference[]) {
+        for (let index = 0; index < docRefs.length; index += this.BATCH_CHUNK_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = docRefs.slice(index, index + this.BATCH_CHUNK_SIZE);
+            chunk.forEach((docRef) => batch.delete(docRef));
+            await batch.commit();
+        }
+    }
+
+    private static async setInBatches(
+        docs: Array<{ ref: DocumentReference; data: Record<string, unknown> }>
+    ) {
+        for (let index = 0; index < docs.length; index += this.BATCH_CHUNK_SIZE) {
+            const batch = writeBatch(db);
+            const chunk = docs.slice(index, index + this.BATCH_CHUNK_SIZE);
+            chunk.forEach(({ ref, data }) => batch.set(ref, data));
+            await batch.commit();
+        }
     }
 
     static async getAll(userId: string): Promise<CriteriaGroup[]> {
@@ -117,30 +141,41 @@ export class CriteriaGroupService {
 
     static async delete(userId: string, id: string): Promise<void> {
         const groupRef = doc(this.getCollectionRef(userId), id);
-        await deleteDoc(groupRef);
-
         const criteriaQuery = query(this.getCriteriaRef(userId), where('groupId', '==', id));
-        const criteriaSnapshot = await getDocs(criteriaQuery);
-        await Promise.all(criteriaSnapshot.docs.map(doc => deleteDoc(doc.ref)));
-
         const candidatesQuery = query(this.getCandidatesRef(userId), where('groupId', '==', id));
-        const candidatesSnapshot = await getDocs(candidatesQuery);
-        await Promise.all(
-            candidatesSnapshot.docs.map(async candidateDoc => {
-                const candidateId = candidateDoc.id;
-                await deleteDoc(candidateDoc.ref);
+        const [criteriaSnapshot, candidatesSnapshot] = await Promise.all([
+            getDocs(criteriaQuery),
+            getDocs(candidatesQuery),
+        ]);
 
+        const valuesSnapshots = await Promise.all(
+            candidatesSnapshot.docs.map((candidateDoc) => {
                 const valuesQuery = query(
                     this.getCandidateValuesRef(userId),
-                    where('candidateId', '==', candidateId)
+                    where('candidateId', '==', candidateDoc.id)
                 );
-                const valuesSnapshot = await getDocs(valuesQuery);
-                await Promise.all(valuesSnapshot.docs.map(doc => deleteDoc(doc.ref)));
+                return getDocs(valuesQuery);
             })
         );
+
+        const docsToDelete: DocumentReference[] = [
+            ...criteriaSnapshot.docs.map((criteriaDoc) => criteriaDoc.ref),
+            ...valuesSnapshots.flatMap((valuesSnapshot) =>
+                valuesSnapshot.docs.map((valueDoc) => valueDoc.ref)
+            ),
+            ...candidatesSnapshot.docs.map((candidateDoc) => candidateDoc.ref),
+        ];
+
+        await this.deleteInBatches(docsToDelete);
+
+        await deleteDoc(groupRef);
     }
 
-    static async duplicate(userId: string, id: string): Promise<string> {
+    static async duplicate(
+        userId: string,
+        id: string,
+        groupTypeOverride?: NonNullable<CriteriaGroup['groupType']>
+    ): Promise<string> {
         const [group, criteria] = await Promise.all([
             this.getById(userId, id),
             CriteriaService.getByGroup(userId, id),
@@ -150,27 +185,30 @@ export class CriteriaGroupService {
             throw new Error('Criteria group not found');
         }
 
+        const targetGroupType = groupTypeOverride ?? group.groupType ?? 'criteria';
+
         const newGroupId = await this.create(
             userId,
             `${group.name} (Copy)`,
             group.description ?? undefined,
             group.method ?? 'WPM',
-            group.groupType ?? 'criteria',
+            targetGroupType,
             group.sourceGroupId ?? null
         );
 
-        await Promise.all(
-            criteria.map((criterion) =>
-                addDoc(this.getCriteriaRef(userId), {
-                    groupId: newGroupId,
-                    name: criterion.name,
-                    dataType: criterion.dataType,
-                    impactType: criterion.impactType,
-                    weight: criterion.weight ?? 0,
-                    createdAt: Timestamp.now(),
-                })
-            )
-        );
+        const docsToCreate = criteria.map((criterion) => ({
+            ref: doc(this.getCriteriaRef(userId)),
+            data: {
+                groupId: newGroupId,
+                name: criterion.name,
+                dataType: criterion.dataType,
+                impactType: criterion.impactType,
+                weight: criterion.weight ?? 0,
+                createdAt: Timestamp.now(),
+            },
+        }));
+
+        await this.setInBatches(docsToCreate);
 
         return newGroupId;
     }
@@ -187,28 +225,33 @@ export class CriteriaGroupService {
             throw new Error('Template group has no criteria');
         }
 
-        const newGroupId = await this.create(
-            userId,
-            name,
-            description,
-            method,
-            'input',
-            templateGroupId
-        );
-
-        await Promise.all(
-            criteria.map((criterion) =>
-                addDoc(this.getCriteriaRef(userId), {
-                    groupId: newGroupId,
+        const newGroupRef = doc(this.getCollectionRef(userId));
+        const docsToCreate = [
+            {
+                ref: newGroupRef,
+                data: {
+                    name,
+                    description: description ?? null,
+                    method,
+                    groupType: 'input',
+                    sourceGroupId: templateGroupId,
+                    createdAt: Timestamp.now(),
+                },
+            },
+            ...criteria.map((criterion) => ({
+                ref: doc(this.getCriteriaRef(userId)),
+                data: {
+                    groupId: newGroupRef.id,
                     name: criterion.name,
                     dataType: criterion.dataType,
                     impactType: criterion.impactType,
                     weight: criterion.weight ?? 0,
                     createdAt: Timestamp.now(),
-                })
-            )
-        );
+                },
+            })),
+        ];
 
-        return newGroupId;
+        await this.setInBatches(docsToCreate);
+        return newGroupRef.id;
     }
 }

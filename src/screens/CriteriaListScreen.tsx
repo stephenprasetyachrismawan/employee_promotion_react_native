@@ -6,7 +6,6 @@ import {
     FlatList,
     TouchableOpacity,
     SafeAreaView,
-    Alert,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
@@ -14,6 +13,10 @@ import { CriteriaGroup } from '../types';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { useAuth } from '../contexts/AuthContext';
+import {
+    deleteGroupWithConfirmation,
+    duplicateGroupWithConfirmation,
+} from '../services/groupActions';
 
 export default function CriteriaListScreen({ navigation }: any) {
     const { user } = useAuth();
@@ -68,53 +71,29 @@ export default function CriteriaListScreen({ navigation }: any) {
         }
     };
 
-    const handleDelete = (id: string, name: string) => {
+    const handleDelete = async (id: string, name: string) => {
         if (!user) return;
-
-        Alert.alert(
-            'Delete Criteria Group',
-            `Are you sure you want to delete "${name}"? This will remove all criteria and data in this group.`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await CriteriaGroupService.delete(user.uid, id);
-                            loadCriteria();
-                        } catch (error) {
-                            console.error('Error deleting criteria group:', error);
-                        }
-                    },
-                },
-            ]
-        );
+        await deleteGroupWithConfirmation({
+            userId: user.uid,
+            groupId: id,
+            groupName: name,
+            groupType: 'criteria',
+            onDeleted: loadCriteria,
+        });
     };
 
-    const handleDuplicate = (id: string, name: string) => {
+    const handleDuplicate = async (id: string, name: string) => {
         if (!user) return;
-
-        Alert.alert(
-            'Duplicate Criteria Group',
-            `Duplicate "${name}" along with all criteria?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Duplicate',
-                    onPress: async () => {
-                        try {
-                            const newGroupId = await CriteriaGroupService.duplicate(user.uid, id);
-                            await loadCriteria();
-                            navigation.navigate('CriteriaGroupDetail', { groupId: newGroupId });
-                        } catch (error) {
-                            console.error('Error duplicating criteria group:', error);
-                            Alert.alert('Error', 'Failed to duplicate criteria group');
-                        }
-                    },
-                },
-            ]
-        );
+        await duplicateGroupWithConfirmation({
+            userId: user.uid,
+            groupId: id,
+            groupName: name,
+            groupType: 'criteria',
+            onDuplicated: async (newGroupId) => {
+                await loadCriteria();
+                navigation.navigate('CriteriaGroupDetail', { groupId: newGroupId });
+            },
+        });
     };
 
     const toggleGroup = (groupId: string) => {
@@ -318,6 +297,26 @@ const styles = StyleSheet.create({
 
     groupName: {
         fontSize: typography.base,
+        fontWeight: typography.semibold,
+        color: colors.textPrimary,
+    },
+
+    methodBadge: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.full,
+    },
+
+    methodBadgeSaw: {
+        backgroundColor: colors.primary + '20',
+    },
+
+    methodBadgeWpm: {
+        backgroundColor: colors.benefit + '20',
+    },
+
+    methodBadgeText: {
+        fontSize: typography.xs,
         fontWeight: typography.semibold,
         color: colors.textPrimary,
     },

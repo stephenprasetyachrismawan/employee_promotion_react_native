@@ -6,7 +6,6 @@ import {
     FlatList,
     TouchableOpacity,
     SafeAreaView,
-    Alert,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
@@ -15,6 +14,7 @@ import { CriteriaService } from '../database/services/CriteriaService';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { useAuth } from '../contexts/AuthContext';
 import { WeightSlider } from '../components/common/WeightSlider';
+import { confirmDialog, showAlert } from '../utils/dialog';
 
 export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
     const { groupId } = route.params || {};
@@ -53,24 +53,28 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
         }
     };
 
-    const handleDelete = (id: string, name: string) => {
+    const handleDelete = async (id: string, name: string) => {
         if (!user) return;
 
-        Alert.alert('Delete Criterion', `Delete "${name}" from this group?`, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: async () => {
-                    try {
-                        await CriteriaService.delete(user.uid, id);
-                        loadGroupData();
-                    } catch (error) {
-                        console.error('Error deleting criterion:', error);
-                    }
-                },
-            },
-        ]);
+        const confirmed = await confirmDialog({
+            title: 'Delete Criterion',
+            message: `Delete "${name}" from this group?`,
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            destructive: true,
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await CriteriaService.delete(user.uid, id);
+            await loadGroupData();
+        } catch (error) {
+            console.error('Error deleting criterion:', error);
+            showAlert('Error', 'Failed to delete criterion');
+        }
     };
 
     const totalWeight = criteria.reduce((sum, criterion) => sum + (criterion.weight ?? 0), 0);
@@ -114,7 +118,7 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
         );
 
         if (unlockedCriteria.length === 0) {
-            Alert.alert('Auto Set', 'Tidak ada kriteria yang bisa diatur otomatis.');
+            showAlert('Auto Set', 'Tidak ada kriteria yang bisa diatur otomatis.');
             return;
         }
 
@@ -123,7 +127,7 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
             0
         );
         if (lockedWeightTotal > 100) {
-            Alert.alert('Auto Set', 'Total bobot yang dikunci melebihi 100%.');
+            showAlert('Auto Set', 'Total bobot yang dikunci melebihi 100%.');
             return;
         }
 

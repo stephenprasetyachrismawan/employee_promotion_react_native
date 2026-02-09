@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { Candidate, CandidateWithValues } from '../../types';
+import { sanitizeStoredImageUri } from '../../utils/imagePersistence';
 
 export class CandidateService {
     private static getCandidatesRef(userId: string) {
@@ -31,7 +32,7 @@ export class CandidateService {
             id: doc.id,
             groupId: doc.data().groupId ?? '',
             name: doc.data().name,
-            imageUri: doc.data().imageUri ?? null,
+            imageUri: sanitizeStoredImageUri(doc.data().imageUri ?? null),
             createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         }));
     }
@@ -48,7 +49,7 @@ export class CandidateService {
             id: doc.id,
             groupId: doc.data().groupId ?? '',
             name: doc.data().name,
-            imageUri: doc.data().imageUri ?? null,
+            imageUri: sanitizeStoredImageUri(doc.data().imageUri ?? null),
             createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         }));
     }
@@ -83,7 +84,7 @@ export class CandidateService {
             id: docSnap.id,
             groupId: docSnap.data().groupId ?? '',
             name: docSnap.data().name,
-            imageUri: docSnap.data().imageUri ?? null,
+            imageUri: sanitizeStoredImageUri(docSnap.data().imageUri ?? null),
             createdAt: docSnap.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
             values,
         };
@@ -129,6 +130,8 @@ export class CandidateService {
         values: Array<{ criterionId: string; value: number }>,
         imageUri?: string | null
     ): Promise<string> {
+        const normalizedImageUri = sanitizeStoredImageUri(imageUri);
+
         // Create candidate
         const candidatePayload: {
             name: string;
@@ -141,8 +144,8 @@ export class CandidateService {
             createdAt: Timestamp.now(),
         };
 
-        if (imageUri) {
-            candidatePayload.imageUri = imageUri;
+        if (normalizedImageUri) {
+            candidatePayload.imageUri = normalizedImageUri;
         }
 
         const candidateRef = await addDoc(this.getCandidatesRef(userId), candidatePayload);
@@ -169,9 +172,11 @@ export class CandidateService {
         values: Array<{ criterionId: string; value: number }>,
         imageUri?: string | null
     ): Promise<void> {
+        const normalizedImageUri = sanitizeStoredImageUri(imageUri);
+
         // Update candidate name
         const candidateRef = doc(this.getCandidatesRef(userId), id);
-        await updateDoc(candidateRef, { name, groupId, imageUri: imageUri ?? null });
+        await updateDoc(candidateRef, { name, groupId, imageUri: normalizedImageUri ?? null });
 
         // Delete old values
         const oldValuesQuery = query(

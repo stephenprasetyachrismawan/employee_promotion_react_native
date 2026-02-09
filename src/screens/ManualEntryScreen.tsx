@@ -6,7 +6,6 @@ import {
     ScrollView,
     TextInput,
     SafeAreaView,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     Image,
@@ -20,6 +19,8 @@ import { CriteriaService } from '../database/services/CriteriaService';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CandidateService } from '../database/services/CandidateService';
 import { useAuth } from '../contexts/AuthContext';
+import { toPersistableImageUri } from '../utils/imagePersistence';
+import { showAlert } from '../utils/dialog';
 
 export default function ManualEntryScreen({ route, navigation }: any) {
     const { candidateId, mode, groupId: routeGroupId } = route.params || { mode: 'add' };
@@ -33,6 +34,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
     const [values, setValues] = useState<{ [key: string]: number | undefined }>({});
     const [method, setMethod] = useState<'WPM' | 'SAW'>('WPM');
     const [loading, setLoading] = useState(false);
+    const MAX_WEB_IMAGE_SIZE_BYTES = 700 * 1024;
 
     useEffect(() => {
         if (groupId) {
@@ -97,11 +99,11 @@ export default function ManualEntryScreen({ route, navigation }: any) {
     const handleSave = async () => {
         if (!user) return;
         if (!groupId) {
-            Alert.alert('Error', 'Please select a criteria group first');
+            showAlert('Error', 'Please select a criteria group first');
             return;
         }
         if (!name.trim()) {
-            Alert.alert('Error', 'Please enter a candidate name');
+            showAlert('Error', 'Please enter a candidate name');
             return;
         }
 
@@ -109,7 +111,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
         for (const criterion of criteria) {
             const value = values[criterion.id];
             if (value === undefined || (method === 'WPM' && value <= 0)) {
-                Alert.alert(
+                showAlert(
                     'Error',
                     method === 'WPM'
                         ? `Nilai untuk ${criterion.name} harus lebih dari 0 (WPM).`
@@ -148,7 +150,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
             navigation.goBack();
         } catch (error) {
             console.error('Error saving candidate:', error);
-            Alert.alert('Error', 'Failed to save candidate');
+            showAlert('Error', 'Failed to save candidate');
         } finally {
             setLoading(false);
         }
@@ -164,6 +166,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
                 type: 'image/*',
                 copyToCacheDirectory: true,
                 multiple: false,
+                base64: Platform.OS === 'web',
             });
 
             if (result.canceled) {
@@ -171,12 +174,29 @@ export default function ManualEntryScreen({ route, navigation }: any) {
             }
 
             const asset = result.assets?.[0];
-            if (asset?.uri) {
-                setImageUri(asset.uri);
+            if (asset) {
+                if (
+                    Platform.OS === 'web' &&
+                    typeof asset.size === 'number' &&
+                    asset.size > MAX_WEB_IMAGE_SIZE_BYTES
+                ) {
+                    showAlert(
+                        'Image Too Large',
+                        'Please choose an image smaller than 700 KB for reliable web saving.'
+                    );
+                    return;
+                }
+
+                const persistedUri = await toPersistableImageUri(asset);
+                if (!persistedUri) {
+                    showAlert('Error', 'Failed to process selected image');
+                    return;
+                }
+                setImageUri(persistedUri);
             }
         } catch (error) {
             console.error('Error selecting image:', error);
-            Alert.alert('Error', 'Failed to select image');
+            showAlert('Error', 'Failed to select image');
         }
     };
 
