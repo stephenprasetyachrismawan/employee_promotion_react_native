@@ -13,6 +13,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
 import { Button } from '../components/common/Button';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { SectionDisclosure } from '../components/common/SectionDisclosure';
+import { MotionView } from '../components/common/MotionView';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { CandidateService } from '../database/services/CandidateService';
 import { ExcelHandler } from '../utils/excelHandler';
@@ -127,92 +130,106 @@ export default function ExcelUploadScreen({ route, navigation }: any) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                {!selectedFile ? (
-                    <View style={styles.uploadSection}>
-                        <TouchableOpacity style={styles.uploadBox} onPress={handlePickFile}>
-                            <FontAwesome5 name="cloud-upload-alt" size={64} color={colors.primary} />
-                            <Text style={styles.uploadTitle}>Upload Excel File</Text>
-                            <Text style={styles.uploadSubtitle}>
-                                Tap to select .xlsx or .xls file
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <>
-                        <View style={styles.fileCard}>
-                            <View style={styles.fileHeader}>
-                                <FontAwesome5 name="file-alt" size={32} color={colors.benefit} />
-                                <View style={styles.fileInfo}>
-                                    <Text style={styles.fileName}>{selectedFile.name}</Text>
-                                    <Text style={styles.fileSize}>
-                                        {selectedFile?.size
-                                            ? `${(selectedFile.size / 1024).toFixed(2)} KB`
-                                            : 'Size unknown'}
-                                    </Text>
-                                </View>
-                                <TouchableOpacity onPress={() => {
-                                    setSelectedFile(null);
-                                    setPreviewData([]);
-                                    setErrors([]);
-                                }}>
-                                    <FontAwesome5 name="times-circle" size={24} color={colors.error} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-
-                        {errors.length > 0 && (
-                            <View style={styles.errorsCard}>
-                                <View style={styles.errorsHeader}>
-                                    <FontAwesome5 name="exclamation-triangle" size={24} color={colors.error} />
-                                    <Text style={styles.errorsTitle}>
-                                        Validation Errors ({errors.length})
-                                    </Text>
-                                </View>
-                                <ScrollView style={styles.errorsList}>
-                                    {errors.map((error, index) => (
-                                        <Text key={index} style={styles.errorText}>
-                                            • {error}
-                                        </Text>
-                                    ))}
-                                </ScrollView>
-                            </View>
-                        )}
-
-                        {previewData.length > 0 && (
-                            <View style={styles.previewCard}>
-                                <Text style={styles.previewTitle}>
-                                    Preview ({previewData.length} candidates)
+            <MotionView style={styles.motionContainer}>
+                <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+                    {!selectedFile ? (
+                        <View style={styles.uploadSection}>
+                            <TouchableOpacity style={styles.uploadBox} onPress={handlePickFile}>
+                                <FontAwesome5 name="cloud-upload-alt" size={64} color={colors.primary} />
+                                <Text style={styles.uploadTitle}>Upload Excel File</Text>
+                                <Text style={styles.uploadSubtitle}>
+                                    Tap to select .xlsx or .xls file
                                 </Text>
-                                {previewData.slice(0, 5).map((candidate, index) => (
-                                    <View key={index} style={styles.previewItem}>
-                                        <FontAwesome5 name="user" size={20} color={colors.primary} />
-                                        <Text style={styles.previewName}>{candidate.name}</Text>
-                                        <Text style={styles.previewCount}>
-                                            {candidate.values.length} values
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <>
+                            <View style={styles.fileCard}>
+                                <View style={styles.fileHeader}>
+                                    <FontAwesome5 name="file-alt" size={32} color={colors.benefit} />
+                                    <View style={styles.fileInfo}>
+                                        <Text style={styles.fileName}>{selectedFile.name}</Text>
+                                        <Text style={styles.fileSize}>
+                                            {selectedFile?.size
+                                                ? `${(selectedFile.size / 1024).toFixed(2)} KB`
+                                                : 'Size unknown'}
                                         </Text>
                                     </View>
-                                ))}
-                                {previewData.length > 5 && (
-                                    <Text style={styles.previewMore}>
-                                        ... and {previewData.length - 5} more
-                                    </Text>
-                                )}
+                                    <TouchableOpacity
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                        onPress={() => {
+                                            setSelectedFile(null);
+                                            setPreviewData([]);
+                                            setErrors([]);
+                                        }}
+                                    >
+                                        <FontAwesome5 name="times-circle" size={24} color={colors.error} />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                        )}
-                    </>
-                )}
-            </ScrollView>
+
+                            {errors.length > 0 && (
+                                <SectionDisclosure
+                                    title={`Validation Errors (${errors.length})`}
+                                    subtitle="Perbaiki error sebelum import."
+                                    iconName="exclamation-triangle"
+                                    containerStyle={styles.errorsCard}
+                                    defaultExpanded
+                                >
+                                    <ScrollView style={styles.errorsList}>
+                                        {errors.map((error, index) => (
+                                            <Text key={index} style={styles.errorText}>
+                                                • {error}
+                                            </Text>
+                                        ))}
+                                    </ScrollView>
+                                </SectionDisclosure>
+                            )}
+
+                            {previewData.length > 0 && (
+                                <SectionDisclosure
+                                    title={`Preview (${previewData.length} candidates)`}
+                                    subtitle="Tinjau data sebelum import."
+                                    iconName="users"
+                                    containerStyle={styles.previewCard}
+                                    defaultExpanded
+                                >
+                                    {previewData.slice(0, 5).map((candidate, index) => (
+                                        <View key={index} style={styles.previewItem}>
+                                            <FontAwesome5 name="user" size={20} color={colors.primary} />
+                                            <Text style={styles.previewName}>{candidate.name}</Text>
+                                            <Text style={styles.previewCount}>
+                                                {candidate.values.length} values
+                                            </Text>
+                                        </View>
+                                    ))}
+                                    {previewData.length > 5 && (
+                                        <Text style={styles.previewMore}>
+                                            ... and {previewData.length - 5} more
+                                        </Text>
+                                    )}
+                                </SectionDisclosure>
+                            )}
+                        </>
+                    )}
+                </ScrollView>
+            </MotionView>
 
             {selectedFile && (
-                <View style={styles.footer}>
+                <BottomActionBar>
                     <Button
                         title={`Import ${previewData.length} Candidate(s)`}
                         onPress={handleImport}
                         disabled={previewData.length === 0 || errors.length > 0}
                         loading={loading}
                     />
-                </View>
+                    <Button
+                        title="Choose Another File"
+                        onPress={handlePickFile}
+                        variant="outline"
+                        disabled={loading}
+                    />
+                </BottomActionBar>
             )}
         </SafeAreaView>
     );
@@ -225,6 +242,10 @@ const styles = StyleSheet.create({
     },
 
     scrollView: {
+        flex: 1,
+    },
+
+    motionContainer: {
         flex: 1,
     },
 
@@ -303,19 +324,6 @@ const styles = StyleSheet.create({
         borderColor: colors.error + '40',
     },
 
-    errorsHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        marginBottom: spacing.md,
-    },
-
-    errorsTitle: {
-        fontSize: typography.base,
-        fontWeight: typography.semibold,
-        color: colors.error,
-    },
-
     errorsList: {
         maxHeight: 200,
     },
@@ -331,13 +339,6 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         ...shadows.sm,
-    },
-
-    previewTitle: {
-        fontSize: typography.base,
-        fontWeight: typography.semibold,
-        color: colors.textPrimary,
-        marginBottom: spacing.md,
     },
 
     previewItem: {
@@ -367,10 +368,4 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
 
-    footer: {
-        padding: spacing.lg,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        backgroundColor: colors.surface,
-    },
 });

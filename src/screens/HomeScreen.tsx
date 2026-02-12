@@ -11,18 +11,21 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { HelpIconButton } from '../components/common/HelpIconButton';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CandidateService } from '../database/services/CandidateService';
 import { useAuth } from '../contexts/AuthContext';
+import { showAlert } from '../utils/dialog';
 
 export default function HomeScreen({ navigation }: any) {
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
     const [groupCount, setGroupCount] = useState(0);
     const [criteriaCount, setCriteriaCount] = useState(0);
     const [readyGroups, setReadyGroups] = useState(0);
     const [candidateCount, setCandidateCount] = useState(0);
-    const [loading, setLoading] = useState(true);
+    const [logoutLoading, setLogoutLoading] = useState(false);
 
     useEffect(() => {
         loadStatus();
@@ -73,15 +76,29 @@ export default function HomeScreen({ navigation }: any) {
             setReadyGroups(readyCount);
         } catch (error) {
             console.error('Error loading status:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
     const isReadyToAnalyze = readyGroups > 0;
 
+    const handleLogout = async () => {
+        setLogoutLoading(true);
+        try {
+            await signOut();
+        } catch (error) {
+            console.error('Error signing out:', error);
+            showAlert('Error', 'Failed to logout');
+        } finally {
+            setLogoutLoading(false);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
+            <HelpIconButton
+                style={styles.helpButton}
+                onPress={() => navigation.navigate('HelpArticle', { topic: 'home' })}
+            />
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
                 {/* Header */}
                 <View style={styles.header}>
@@ -140,12 +157,6 @@ export default function HomeScreen({ navigation }: any) {
                     <Text style={styles.analyzeSubtitle}>
                         Jalankan Decision Support System dengan metode WPM atau SAW.
                     </Text>
-                    <Button
-                        title="View Results"
-                        onPress={() => navigation.navigate('Results')}
-                        disabled={!isReadyToAnalyze}
-                        style={styles.analyzeButton}
-                    />
                     {!isReadyToAnalyze && (
                         <Text style={styles.warningText}>
                             {groupCount === 0 && '• Create a criteria group first\n'}
@@ -155,6 +166,21 @@ export default function HomeScreen({ navigation }: any) {
                     )}
                 </Card>
             </ScrollView>
+            <BottomActionBar>
+                <Button
+                    title="View Results"
+                    onPress={() => navigation.navigate('Results')}
+                    disabled={!isReadyToAnalyze}
+                />
+                <Button
+                    title="Logout"
+                    onPress={handleLogout}
+                    variant="outline"
+                    loading={logoutLoading}
+                    style={styles.logoutButton}
+                    textStyle={styles.logoutButtonText}
+                />
+            </BottomActionBar>
         </SafeAreaView>
     );
 }
@@ -163,6 +189,13 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
+    },
+
+    helpButton: {
+        position: 'absolute',
+        top: spacing.md,
+        right: spacing.lg,
+        zIndex: 20,
     },
 
     scrollView: {
@@ -271,13 +304,17 @@ const styles = StyleSheet.create({
         marginBottom: spacing.lg,
     },
 
-    analyzeButton: {
-        marginTop: spacing.md,
-    },
-
     warningText: {
         fontSize: typography.sm,
         color: colors.warning,
         marginTop: spacing.md,
+    },
+
+    logoutButton: {
+        borderColor: colors.error,
+    },
+
+    logoutButtonText: {
+        color: colors.error,
     },
 });

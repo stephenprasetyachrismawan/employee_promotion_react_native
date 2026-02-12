@@ -11,6 +11,7 @@ export interface Criterion {
     dataType: DataType;
     impactType: ImpactType;
     weight: number;
+    isWeightLocked?: boolean;
     createdAt: string;
 }
 

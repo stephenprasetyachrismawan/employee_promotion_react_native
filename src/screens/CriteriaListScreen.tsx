@@ -13,6 +13,10 @@ import { CriteriaGroup } from '../types';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/common/Button';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { HelpIconButton } from '../components/common/HelpIconButton';
+import { SwipeableRow } from '../components/common/SwipeableRow';
 import {
     deleteGroupWithConfirmation,
     duplicateGroupWithConfirmation,
@@ -108,95 +112,116 @@ export default function CriteriaListScreen({ navigation }: any) {
         const isExpanded = expandedGroups[item.id] ?? true;
 
         return (
-            <View style={styles.groupCard}>
-                <TouchableOpacity
-                    style={styles.groupHeader}
-                    activeOpacity={0.7}
-                    onPress={() => toggleGroup(item.id)}
-                >
-                    <View style={styles.groupContent}>
-                        <View style={styles.iconContainer}>
-                            <FontAwesome5 name="layer-group" size={24} color={colors.primary} />
-                        </View>
-                        <View style={styles.groupInfo}>
-                            <View style={styles.groupTitleRow}>
-                                <Text style={styles.groupName}>{item.name}</Text>
-                                <View
-                                    style={[
-                                        styles.methodBadge,
-                                        item.method === 'SAW'
-                                            ? styles.methodBadgeSaw
-                                            : styles.methodBadgeWpm,
-                                    ]}
-                                >
-                                    <Text style={styles.methodBadgeText}>{item.method}</Text>
+            <SwipeableRow
+                containerStyle={styles.groupRow}
+                rightActions={[
+                    {
+                        id: 'edit',
+                        label: 'Edit',
+                        icon: 'edit',
+                        color: colors.textSecondary,
+                        onPress: () =>
+                            navigation.navigate('CriteriaGroupForm', {
+                                groupId: item.id,
+                                mode: 'edit',
+                            }),
+                    },
+                    {
+                        id: 'duplicate',
+                        label: 'Copy',
+                        icon: 'copy',
+                        color: colors.primary,
+                        onPress: () => handleDuplicate(item.id, item.name),
+                    },
+                    {
+                        id: 'delete',
+                        label: 'Delete',
+                        icon: 'trash',
+                        color: colors.error,
+                        onPress: () => handleDelete(item.id, item.name),
+                    },
+                ]}
+                leftActions={[
+                    {
+                        id: 'detail',
+                        label: 'Detail',
+                        icon: 'eye',
+                        color: colors.benefit,
+                        onPress: () =>
+                            navigation.navigate('CriteriaGroupDetail', { groupId: item.id }),
+                    },
+                ]}
+            >
+                <View style={styles.groupCard}>
+                    <TouchableOpacity
+                        style={styles.groupHeader}
+                        activeOpacity={0.7}
+                        onPress={() => toggleGroup(item.id)}
+                    >
+                        <View style={styles.groupContent}>
+                            <View style={styles.iconContainer}>
+                                <FontAwesome5 name="layer-group" size={24} color={colors.primary} />
+                            </View>
+                            <View style={styles.groupInfo}>
+                                <View style={styles.groupTitleRow}>
+                                    <Text style={styles.groupName}>{item.name}</Text>
+                                    <View
+                                        style={[
+                                            styles.methodBadge,
+                                            item.method === 'SAW'
+                                                ? styles.methodBadgeSaw
+                                                : styles.methodBadgeWpm,
+                                        ]}
+                                    >
+                                        <Text style={styles.methodBadgeText}>{item.method}</Text>
+                                    </View>
                                 </View>
                             </View>
                         </View>
-                    </View>
-                    <FontAwesome5
-                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                        size={20}
-                        color={colors.textSecondary}
-                    />
-                </TouchableOpacity>
-                {isExpanded && (
-                    <View style={styles.groupDetails}>
-                        <Text style={styles.groupMeta}>
-                            {count} {count === 1 ? 'criterion' : 'criteria'}
-                        </Text>
-                        <View style={styles.actions}>
+                        <FontAwesome5
+                            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                            size={20}
+                            color={colors.textSecondary}
+                        />
+                    </TouchableOpacity>
+                    {isExpanded && (
+                        <View style={styles.groupDetails}>
+                            <Text style={styles.groupMeta}>
+                                {count} {count === 1 ? 'criterion' : 'criteria'}
+                            </Text>
                             <TouchableOpacity
                                 style={styles.detailButton}
                                 onPress={() =>
                                     navigation.navigate('CriteriaGroupDetail', { groupId: item.id })
                                 }
                             >
+                                <FontAwesome5
+                                    name="arrow-right"
+                                    size={14}
+                                    color={colors.primary}
+                                />
                                 <Text style={styles.detailButtonText}>Lihat Detail</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.actionButton}
-                                onPress={() =>
-                                    navigation.navigate('CriteriaGroupForm', {
-                                        groupId: item.id,
-                                        mode: 'edit',
-                                    })
-                                }
-                            >
-                                <FontAwesome5
-                                    name="edit"
-                                    size={20}
-                                    color={colors.textSecondary}
-                                />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.actionButton}
-                                onPress={() => handleDuplicate(item.id, item.name)}
-                            >
-                                <FontAwesome5
-                                    name="copy"
-                                    size={20}
-                                    color={colors.textSecondary}
-                                />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.actionButton}
-                                onPress={() => handleDelete(item.id, item.name)}
-                            >
-                                <FontAwesome5 name="trash" size={20} color={colors.error} />
-                            </TouchableOpacity>
+                            <Text style={styles.swipeHint}>
+                                Geser kartu untuk edit, duplikat, atau hapus.
+                            </Text>
                         </View>
-                    </View>
-                )}
-            </View>
+                    )}
+                </View>
+            </SwipeableRow>
         );
     };
 
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Criteria Groups</Text>
-                <Text style={styles.subtitle}>Group criteria and manage weights.</Text>
+                <View style={styles.headerTextWrap}>
+                    <Text style={styles.title}>Criteria Groups</Text>
+                    <Text style={styles.subtitle}>Group criteria and manage weights.</Text>
+                </View>
+                <HelpIconButton
+                    onPress={() => navigation.navigate('HelpArticle', { topic: 'criteria_list' })}
+                />
             </View>
 
             {groups.length === 0 && !loading ? (
@@ -216,12 +241,12 @@ export default function CriteriaListScreen({ navigation }: any) {
                 />
             )}
 
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() => navigation.navigate('CriteriaGroupForm', { mode: 'add' })}
-            >
-                <FontAwesome5 name="plus" size={28} color={colors.surface} />
-            </TouchableOpacity>
+            <BottomActionBar>
+                <Button
+                    title="Tambah Group Criteria"
+                    onPress={() => navigation.navigate('CriteriaGroupForm', { mode: 'add' })}
+                />
+            </BottomActionBar>
         </SafeAreaView>
     );
 }
@@ -235,6 +260,14 @@ const styles = StyleSheet.create({
     header: {
         padding: spacing.lg,
         paddingTop: spacing.xl,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+    },
+
+    headerTextWrap: {
+        flex: 1,
     },
 
     title: {
@@ -258,8 +291,11 @@ const styles = StyleSheet.create({
         backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
-        marginBottom: spacing.md,
         ...shadows.sm,
+    },
+
+    groupRow: {
+        marginBottom: spacing.md,
     },
 
     groupHeader: {
@@ -331,29 +367,28 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
     },
 
-    actions: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        gap: spacing.sm,
-        marginTop: spacing.sm,
-    },
-
-    actionButton: {
-        padding: spacing.sm,
-    },
-
     detailButton: {
+        marginTop: spacing.sm,
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        minHeight: 44,
         backgroundColor: colors.background,
         borderRadius: borderRadius.full,
+        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
     },
 
     detailButtonText: {
         fontSize: typography.sm,
         fontWeight: typography.semibold,
         color: colors.primary,
+    },
+
+    swipeHint: {
+        marginTop: spacing.sm,
+        fontSize: typography.xs,
+        color: colors.textTertiary,
     },
 
     emptyState: {
@@ -375,18 +410,5 @@ const styles = StyleSheet.create({
         color: colors.textTertiary,
         marginTop: spacing.xs,
         textAlign: 'center',
-    },
-
-    fab: {
-        position: 'absolute',
-        right: spacing.lg,
-        bottom: spacing.lg,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...shadows.lg,
     },
 });

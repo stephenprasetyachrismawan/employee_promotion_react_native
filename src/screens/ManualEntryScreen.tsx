@@ -14,6 +14,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import { colors, typography, spacing, borderRadius } from '../styles/theme';
 import { Button } from '../components/common/Button';
 import { ScaleSlider } from '../components/common/ScaleSlider';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { SectionDisclosure } from '../components/common/SectionDisclosure';
+import { MotionView } from '../components/common/MotionView';
 import { Criterion } from '../types';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
@@ -206,11 +209,13 @@ export default function ManualEntryScreen({ route, navigation }: any) {
                 style={styles.keyboardView}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.content}
-                    keyboardShouldPersistTaps="handled"
-                >
+                <MotionView style={styles.motionContainer}>
+                    <ScrollView
+                        style={styles.scrollView}
+                        contentContainerStyle={styles.content}
+                        keyboardShouldPersistTaps="handled"
+                        keyboardDismissMode="on-drag"
+                    >
                     <Text style={styles.sectionTitle}>Candidate Name</Text>
                     <TextInput
                         style={styles.input}
@@ -220,90 +225,104 @@ export default function ManualEntryScreen({ route, navigation }: any) {
                         onChangeText={setName}
                     />
 
-                    <Text style={styles.sectionTitle}>Candidate Photo</Text>
-                    <View style={styles.photoCard}>
-                        {imageUri ? (
-                            <Image source={{ uri: imageUri }} style={styles.photoPreview} />
-                        ) : (
-                            <View style={styles.photoPlaceholder}>
-                                <Text style={styles.photoPlaceholderText}>
-                                    No photo selected
-                                </Text>
-                            </View>
-                        )}
-                        <View style={styles.photoActions}>
-                            <Button
-                                title={imageUri ? 'Change Photo' : 'Select Photo'}
-                                onPress={handleSelectImage}
-                                variant="outline"
-                            />
+                    <SectionDisclosure
+                        title="Candidate Photo"
+                        subtitle="Opsional, untuk identifikasi kandidat."
+                        iconName="camera"
+                        containerStyle={styles.photoSection}
+                    >
+                        <View style={styles.photoCard}>
                             {imageUri ? (
-                                <Button
-                                    title="Remove Photo"
-                                    onPress={() => setImageUri(null)}
-                                    variant="secondary"
-                                />
-                            ) : null}
-                        </View>
-                    </View>
-
-                    <Text style={styles.sectionTitle}>Criterion Values</Text>
-                    <Text style={styles.sectionSubtitle}>
-                        {method === 'WPM'
-                            ? 'WPM: nilai harus lebih dari 0 untuk semua kriteria.'
-                            : 'SAW: nilai akan dinormalisasi per kriteria.'}
-                    </Text>
-
-                    {criteria.map((criterion) => (
-                        <View key={criterion.id} style={styles.criterionSection}>
-                            <View style={styles.criterionHeader}>
-                                <Text style={styles.criterionName}>{criterion.name}</Text>
-                                <View style={styles.criterionBadge}>
-                                    <Text style={styles.criterionBadgeText}>
-                                        {criterion.dataType}
+                                <Image source={{ uri: imageUri }} style={styles.photoPreview} />
+                            ) : (
+                                <View style={styles.photoPlaceholder}>
+                                    <Text style={styles.photoPlaceholderText}>
+                                        No photo selected
                                     </Text>
                                 </View>
-                            </View>
-
-                            {criterion.dataType === 'NUMERIC' ? (
-                                <TextInput
-                                    style={styles.numericInput}
-                                    placeholder="Enter value"
-                                    placeholderTextColor={colors.textTertiary}
-                                    keyboardType="numeric"
-                                    value={
-                                        values[criterion.id] !== undefined
-                                            ? values[criterion.id]?.toString()
-                                            : ''
-                                    }
-                                    onChangeText={(text) => {
-                                        if (text.trim() === '') {
-                                            handleValueChange(criterion.id, undefined);
-                                            return;
-                                        }
-                                        const numValue = parseFloat(text);
-                                        handleValueChange(criterion.id, Number.isNaN(numValue) ? 0 : numValue);
-                                    }}
-                                />
-                            ) : (
-                                <View style={styles.scaleContainer}>
-                                    <ScaleSlider
-                                        value={values[criterion.id] || 3}
-                                        onChange={(value) => handleValueChange(criterion.id, value)}
-                                    />
-                                </View>
                             )}
-
-                            <Text style={styles.criterionHint}>
-                                {criterion.impactType === 'BENEFIT'
-                                    ? 'Higher is better'
-                                    : 'Lower is better'}
-                            </Text>
+                            <View style={styles.photoActions}>
+                                <Button
+                                    title={imageUri ? 'Change Photo' : 'Select Photo'}
+                                    onPress={handleSelectImage}
+                                    variant="outline"
+                                />
+                                {imageUri ? (
+                                    <Button
+                                        title="Remove Photo"
+                                        onPress={() => setImageUri(null)}
+                                        variant="secondary"
+                                    />
+                                ) : null}
+                            </View>
                         </View>
-                    ))}
-                </ScrollView>
+                    </SectionDisclosure>
 
-                <View style={styles.footer}>
+                    <SectionDisclosure
+                        title="Criterion Values"
+                        subtitle={
+                            method === 'WPM'
+                                ? 'WPM: nilai harus lebih dari 0 untuk semua kriteria.'
+                                : 'SAW: nilai akan dinormalisasi per kriteria.'
+                        }
+                        iconName="sliders-h"
+                        defaultExpanded
+                    >
+                        {criteria.map((criterion) => (
+                            <View key={criterion.id} style={styles.criterionSection}>
+                                <View style={styles.criterionHeader}>
+                                    <Text style={styles.criterionName}>{criterion.name}</Text>
+                                    <View style={styles.criterionBadge}>
+                                        <Text style={styles.criterionBadgeText}>
+                                            {criterion.dataType}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {criterion.dataType === 'NUMERIC' ? (
+                                    <TextInput
+                                        style={styles.numericInput}
+                                        placeholder="Enter value"
+                                        placeholderTextColor={colors.textTertiary}
+                                        keyboardType="numeric"
+                                        value={
+                                            values[criterion.id] !== undefined
+                                                ? values[criterion.id]?.toString()
+                                                : ''
+                                        }
+                                        onChangeText={(text) => {
+                                            if (text.trim() === '') {
+                                                handleValueChange(criterion.id, undefined);
+                                                return;
+                                            }
+                                            const numValue = parseFloat(text);
+                                            handleValueChange(
+                                                criterion.id,
+                                                Number.isNaN(numValue) ? 0 : numValue
+                                            );
+                                        }}
+                                    />
+                                ) : (
+                                    <View style={styles.scaleContainer}>
+                                        <ScaleSlider
+                                            value={values[criterion.id] || 3}
+                                            onChange={(value) => handleValueChange(criterion.id, value)}
+                                        />
+                                    </View>
+                                )}
+
+                                <Text style={styles.criterionHint}>
+                                    {criterion.impactType === 'BENEFIT'
+                                        ? 'Higher is better'
+                                        : 'Lower is better'}
+                                </Text>
+                            </View>
+                        ))}
+                    </SectionDisclosure>
+                    </ScrollView>
+                </MotionView>
+
+                <BottomActionBar>
                     <Button
                         title={isEditMode ? 'Update Candidate' : 'Add Candidate'}
                         onPress={handleSave}
@@ -315,7 +334,7 @@ export default function ManualEntryScreen({ route, navigation }: any) {
                         onPress={() => navigation.goBack()}
                         variant="outline"
                     />
-                </View>
+                </BottomActionBar>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -335,6 +354,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
+    motionContainer: {
+        flex: 1,
+    },
+
     content: {
         padding: spacing.lg,
         paddingBottom: spacing['3xl'],
@@ -348,10 +371,8 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
     },
 
-    sectionSubtitle: {
-        fontSize: typography.sm,
-        color: colors.textSecondary,
-        marginBottom: spacing.lg,
+    photoSection: {
+        marginTop: spacing.md,
     },
 
     input: {
@@ -453,14 +474,6 @@ const styles = StyleSheet.create({
         color: colors.textTertiary,
         marginTop: spacing.sm,
         fontStyle: 'italic',
-    },
-
-    footer: {
-        padding: spacing.lg,
-        gap: spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        backgroundColor: colors.surface,
     },
 
     saveButton: {

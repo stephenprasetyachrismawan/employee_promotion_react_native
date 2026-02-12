@@ -10,6 +10,10 @@ import {
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
+import { Button } from '../components/common/Button';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { HelpIconButton } from '../components/common/HelpIconButton';
+import { SwipeableRow } from '../components/common/SwipeableRow';
 import { Criterion, CriteriaGroup, DecisionResult } from '../types';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
@@ -51,65 +55,78 @@ const CandidateResultCard: React.FC<CandidateResultCardProps> = ({
     const scorePercentage = maxScore > 0 ? (result.score / maxScore) * 100 : 0;
 
     return (
-        <TouchableOpacity
-            style={[
-                styles.resultCard,
-                result.rank === 1 && styles.topRankCard,
+        <SwipeableRow
+            containerStyle={styles.resultRow}
+            leftActions={[
+                {
+                    id: `toggle-${result.candidateId}`,
+                    label: isExpanded ? 'Hide' : 'Detail',
+                    icon: isExpanded ? 'chevron-up' : 'chevron-down',
+                    color: colors.primary,
+                    onPress: onToggle,
+                },
             ]}
-            onPress={onToggle}
         >
-            <View style={styles.rankBadge}>
-                <Text style={[styles.rankNumber, { color: getRankColor(result.rank) }]}>
-                    {result.rank}
-                </Text>
-            </View>
-            <View style={styles.resultHeader}>
-                {result.imageUri ? (
-                    <Image source={{ uri: result.imageUri }} style={styles.candidateAvatar} />
-                ) : (
-                    <View style={styles.candidateAvatarPlaceholder}>
-                        <FontAwesome5 name="user" size={18} color={colors.textSecondary} />
-                    </View>
-                )}
+            <TouchableOpacity
+                style={[
+                    styles.resultCard,
+                    result.rank === 1 && styles.topRankCard,
+                ]}
+                onPress={onToggle}
+            >
+                <View style={styles.rankBadge}>
+                    <Text style={[styles.rankNumber, { color: getRankColor(result.rank) }]}>
+                        {result.rank}
+                    </Text>
+                </View>
+                <View style={styles.resultHeader}>
+                    {result.imageUri ? (
+                        <Image source={{ uri: result.imageUri }} style={styles.candidateAvatar} />
+                    ) : (
+                        <View style={styles.candidateAvatarPlaceholder}>
+                            <FontAwesome5 name="user" size={18} color={colors.textSecondary} />
+                        </View>
+                    )}
 
-                <View style={styles.candidateInfo}>
-                    <Text style={styles.candidateName}>{result.candidateName}</Text>
-                    <View style={styles.scoreBar}>
-                        <View
-                            style={[styles.scoreBarFill, { width: `${scorePercentage}%` }]}
-                        />
+                    <View style={styles.candidateInfo}>
+                        <Text style={styles.candidateName}>{result.candidateName}</Text>
+                        <View style={styles.scoreBar}>
+                            <View
+                                style={[styles.scoreBarFill, { width: `${scorePercentage}%` }]}
+                            />
+                        </View>
+                        <Text style={styles.scoreText}>Skor: {result.score.toFixed(4)}</Text>
                     </View>
-                    <Text style={styles.scoreText}>Skor: {result.score.toFixed(4)}</Text>
+
+                    {result.rank === 1 && (
+                        <FontAwesome5 name="trophy" size={28} color={colors.warning} />
+                    )}
+
+                    <FontAwesome5
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={24}
+                        color={colors.textSecondary}
+                    />
                 </View>
 
-                {result.rank === 1 && (
-                    <FontAwesome5 name="trophy" size={28} color={colors.warning} />
-                )}
-
-                <FontAwesome5
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={24}
-                    color={colors.textSecondary}
-                />
-            </View>
-
-            {isExpanded && (
-                <View style={styles.detailsSection}>
-                    <View style={styles.divider} />
-                    <View style={styles.detailsGrid}>
-                        {criteria.map((criterion) => {
-                            const value = result.values[criterion.id];
-                            return (
-                                <View key={criterion.id} style={styles.detailItem}>
-                                    <Text style={styles.detailLabel}>{criterion.name}</Text>
-                                    <Text style={styles.detailValue}>{value}</Text>
-                                </View>
-                            );
-                        })}
+                {isExpanded && (
+                    <View style={styles.detailsSection}>
+                        <View style={styles.divider} />
+                        <View style={styles.detailsGrid}>
+                            {criteria.map((criterion) => {
+                                const value = result.values[criterion.id];
+                                return (
+                                    <View key={criterion.id} style={styles.detailItem}>
+                                        <Text style={styles.detailLabel}>{criterion.name}</Text>
+                                        <Text style={styles.detailValue}>{value}</Text>
+                                    </View>
+                                );
+                            })}
+                        </View>
                     </View>
-                </View>
-            )}
-        </TouchableOpacity>
+                )}
+            </TouchableOpacity>
+        </SwipeableRow>
     );
 };
 
@@ -168,6 +185,7 @@ export default function ResultsScreen({ navigation }: any) {
                             group,
                             criteria: criteriaData,
                             results: [],
+                            maxScore: 0,
                             status: 'missingCriteria' as const,
                         };
                     }
@@ -177,6 +195,7 @@ export default function ResultsScreen({ navigation }: any) {
                             group,
                             criteria: criteriaData,
                             results: [],
+                            maxScore: 0,
                             status: 'missingCandidates' as const,
                         };
                     }
@@ -190,6 +209,7 @@ export default function ResultsScreen({ navigation }: any) {
                             group,
                             criteria: criteriaData,
                             results: [],
+                            maxScore: 0,
                             status: 'invalidWeights' as const,
                         };
                     }
@@ -237,10 +257,15 @@ export default function ResultsScreen({ navigation }: any) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Decision Support System Results</Text>
-                    <Text style={styles.subtitle}>
-                        Rangking berbasis metode grup (WPM atau SAW).
-                    </Text>
+                    <View style={styles.headerTextWrap}>
+                        <Text style={styles.title}>Decision Support System Results</Text>
+                        <Text style={styles.subtitle}>
+                            Rangking berbasis metode grup (WPM atau SAW).
+                        </Text>
+                    </View>
+                    <HelpIconButton
+                        onPress={() => navigation.navigate('HelpArticle', { topic: 'results' })}
+                    />
                 </View>
                 <View style={styles.emptyState}>
                     <FontAwesome5 name="exclamation-circle" size={64} color={colors.textTertiary} />
@@ -250,6 +275,9 @@ export default function ResultsScreen({ navigation }: any) {
                         {error.includes('Failed') && 'Try refreshing the results'}
                     </Text>
                 </View>
+                <BottomActionBar>
+                    <Button title="Refresh Results" onPress={loadResults} />
+                </BottomActionBar>
             </SafeAreaView>
         );
     }
@@ -257,10 +285,15 @@ export default function ResultsScreen({ navigation }: any) {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Decision Support System Results</Text>
-                <Text style={styles.subtitle}>
-                    Rangking berbasis metode grup (WPM atau SAW).
-                </Text>
+                <View style={styles.headerTextWrap}>
+                    <Text style={styles.title}>Decision Support System Results</Text>
+                    <Text style={styles.subtitle}>
+                        Rangking berbasis metode grup (WPM atau SAW).
+                    </Text>
+                </View>
+                <HelpIconButton
+                    onPress={() => navigation.navigate('HelpArticle', { topic: 'results' })}
+                />
             </View>
 
             {loading ? (
@@ -341,17 +374,30 @@ export default function ResultsScreen({ navigation }: any) {
                                                 key={result.candidateId}
                                                 result={result}
                                                 criteria={groupResult.criteria}
+                                                maxScore={groupResult.maxScore}
                                                 onToggle={() => toggleExpand(result.candidateId)}
                                                 isExpanded={expandedId === result.candidateId}
                                             />
                                         ))
                                     )}
+                                    {groupResult.status === 'ready' ? (
+                                        <Text style={styles.gestureHint}>
+                                            Tap atau geser kartu kandidat untuk lihat detail.
+                                        </Text>
+                                    ) : null}
                                 </>
                             )}
                         </View>
                     ))}
                 </ScrollView>
             )}
+            <BottomActionBar>
+                <Button
+                    title={loading ? 'Refreshing...' : 'Refresh Results'}
+                    onPress={loadResults}
+                    disabled={loading}
+                />
+            </BottomActionBar>
         </SafeAreaView>
     );
 }
@@ -365,6 +411,14 @@ const styles = StyleSheet.create({
     header: {
         padding: spacing.lg,
         paddingTop: spacing.xl,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+    },
+
+    headerTextWrap: {
+        flex: 1,
     },
 
     title: {
@@ -461,13 +515,23 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
     },
 
+    gestureHint: {
+        fontSize: typography.xs,
+        color: colors.textTertiary,
+        marginTop: spacing.sm,
+        marginBottom: spacing.xs,
+    },
+
     resultCard: {
         backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
-        marginBottom: spacing.md,
         position: 'relative',
         ...shadows.md,
+    },
+
+    resultRow: {
+        marginBottom: spacing.md,
     },
 
     topRankCard: {

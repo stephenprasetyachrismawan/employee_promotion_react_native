@@ -1,35 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
+    ActivityIndicator,
     FlatList,
-    TouchableOpacity,
-    SafeAreaView,
     Image,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { colors, typography, spacing, borderRadius, shadows } from '../styles/theme';
+import { borderRadius, colors, shadows, spacing, typography } from '../styles/theme';
 import { Button } from '../components/common/Button';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { HelpIconButton } from '../components/common/HelpIconButton';
+import { SwipeableRow } from '../components/common/SwipeableRow';
 import { Candidate, CriteriaGroup } from '../types';
-import { CandidateService } from '../database/services/CandidateService';
-import { CriteriaService } from '../database/services/CriteriaService';
-import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
-import { ExcelHandler } from '../utils/excelHandler';
 import { useAuth } from '../contexts/AuthContext';
+import { CandidateService } from '../database/services/CandidateService';
+import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
+import { CriteriaService } from '../database/services/CriteriaService';
+import { ExcelHandler } from '../utils/excelHandler';
 import { confirmDialog, showAlert } from '../utils/dialog';
 import {
     deleteGroupWithConfirmation,
     duplicateGroupWithConfirmation,
 } from '../services/groupActions';
 
+type InputView = 'candidates' | 'groups';
+
 export default function InputDataScreen({ navigation }: any) {
     const { user } = useAuth();
-    const [candidates, setCandidates] = useState<Candidate[]>([]);
+    const [activeView, setActiveView] = useState<InputView>('candidates');
     const [groups, setGroups] = useState<CriteriaGroup[]>([]);
     const [selectedGroup, setSelectedGroup] = useState<CriteriaGroup | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [criteriaCount, setCriteriaCount] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [criteriaCountsByGroup, setCriteriaCountsByGroup] = useState<Record<string, number>>({});
+    const [candidateCountsByGroup, setCandidateCountsByGroup] = useState<Record<string, number>>({});
 
     useEffect(() => {
         loadData();
@@ -37,49 +46,118 @@ export default function InputDataScreen({ navigation }: any) {
 
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
-            loadData();
+            loadData(selectedGroup?.id ?? undefined);
         });
 
         return unsubscribe;
-    }, [navigation]);
+    }, [navigation, selectedGroup?.id]);
+
+    const methodBadgeStyle = (method: string) =>
+        method === 'SAW' ? styles.methodBadgeSaw : styles.methodBadgeWpm;
+
+    const getCriteriaCount = (groupId: string) => criteriaCountsByGroup[groupId] ?? 0;
+    const getCandidateCount = (groupId: string) => candidateCountsByGroup[groupId] ?? 0;
 
     const loadData = async (preferredGroupId?: string | null) => {
         if (!user) return;
+
+        setLoading(true);
         try {
             const groupsData = await CriteriaGroupService.getAllByType(user.uid, 'input');
             setGroups(groupsData);
+
+            const summaries = await Promise.all(
+                groupsData.map(async (group) => {
+                    const [groupCriteriaCount, groupCandidates] = await Promise.all([
+                        CriteriaService.countByGroup(user.uid, group.id),
+                        CandidateService.getAllByGroup(user.uid, group.id),
+                    ]);
+
+                    return {
+                        groupId: group.id,
+                        criteriaCount: groupCriteriaCount,
+                        candidateCount: groupCandidates.length,
+                        candidates: groupCandidates,
+                    };
+                })
+            );
+
+            setCriteriaCountsByGroup(
+                summaries.reduce<Record<string, number>>((acc, item) => {
+                    acc[item.groupId] = item.criteriaCount;
+                    return acc;
+                }, {})
+            );
+
+            setCandidateCountsByGroup(
+                summaries.reduce<Record<string, number>>((acc, item) => {
+                    acc[item.groupId] = item.candidateCount;
+                    return acc;
+                }, {})
+            );
 
             const activeGroup = preferredGroupId
                 ? groupsData.find((group) => group.id === preferredGroupId) ?? null
                 : selectedGroup
                     ? groupsData.find((group) => group.id === selectedGroup.id) ?? null
                     : groupsData[0] ?? null;
+
             setSelectedGroup(activeGroup);
 
             if (activeGroup) {
-                const [candidatesData, count] = await Promise.all([
-                    CandidateService.getAllByGroup(user.uid, activeGroup.id),
-                    CriteriaService.countByGroup(user.uid, activeGroup.id),
-                ]);
-                setCandidates(candidatesData);
-                setCriteriaCount(count);
+                const activeSummary = summaries.find((item) => item.groupId === activeGroup.id);
+                if (activeSummary) {
+                    setCandidates(activeSummary.candidates);
+                    setCriteriaCount(activeSummary.criteriaCount);
+                } else {
+                    const [candidatesData, count] = await Promise.all([
+                        CandidateService.getAllByGroup(user.uid, activeGroup.id),
+                        CriteriaService.countByGroup(user.uid, activeGroup.id),
+                    ]);
+                    setCandidates(candidatesData);
+                    setCriteriaCount(count);
+                }
             } else {
                 setCandidates([]);
                 setCriteriaCount(0);
             }
         } catch (error) {
-            console.error('Error loading data:', error);
+            console.error('Error loading input data:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleDelete = async (id: string, name: string) => {
+    const handleSelectGroup = async (group: CriteriaGroup) => {
+        if (!user) return;
+
+        setSelectedGroup(group);
+        setActiveView('candidates');
+        setLoading(true);
+
+        try {
+            const [candidatesData, count] = await Promise.all([
+                CandidateService.getAllByGroup(user.uid, group.id),
+                CriteriaService.countByGroup(user.uid, group.id),
+            ]);
+
+            setCandidates(candidatesData);
+            setCriteriaCount(count);
+            setCriteriaCountsByGroup((prev) => ({ ...prev, [group.id]: count }));
+            setCandidateCountsByGroup((prev) => ({ ...prev, [group.id]: candidatesData.length }));
+        } catch (error) {
+            console.error('Error selecting input group:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteCandidate = async (candidateId: string, candidateName: string) => {
         if (!user) return;
 
         const confirmed = await confirmDialog({
             title: 'Delete Candidate',
-            message: `Are you sure you want to delete "${name}"?`,
+            message: `Are you sure you want to delete "${candidateName}"?`,
             confirmText: 'Delete',
             cancelText: 'Cancel',
             destructive: true,
@@ -90,31 +168,33 @@ export default function InputDataScreen({ navigation }: any) {
         }
 
         try {
-            await CandidateService.delete(user.uid, id);
-            await loadData();
+            await CandidateService.delete(user.uid, candidateId);
+            await loadData(selectedGroup?.id ?? undefined);
         } catch (error) {
             console.error('Error deleting candidate:', error);
             showAlert('Error', 'Failed to delete candidate');
         }
     };
 
-    const handleDeleteGroup = async (id: string, name: string) => {
+    const handleDeleteGroup = async (groupId: string, groupName: string) => {
         if (!user) return;
         await deleteGroupWithConfirmation({
             userId: user.uid,
-            groupId: id,
-            groupName: name,
+            groupId,
+            groupName,
             groupType: 'input',
-            onDeleted: loadData,
+            onDeleted: async () => {
+                await loadData();
+            },
         });
     };
 
-    const handleDuplicateGroup = async (id: string, name: string) => {
+    const handleDuplicateGroup = async (groupId: string, groupName: string) => {
         if (!user) return;
         await duplicateGroupWithConfirmation({
             userId: user.uid,
-            groupId: id,
-            groupName: name,
+            groupId,
+            groupName,
             groupType: 'input',
             onDuplicated: async (newGroupId) => {
                 await loadData(newGroupId);
@@ -122,21 +202,21 @@ export default function InputDataScreen({ navigation }: any) {
         });
     };
 
-    const methodBadgeStyle = (method: string) =>
-        method === 'SAW' ? styles.methodBadgeSaw : styles.methodBadgeWpm;
-
     const handleDownloadTemplate = async () => {
         if (!user) return;
+
         try {
             if (!selectedGroup) {
                 showAlert('No Group', 'Please select a criteria group first');
                 return;
             }
+
             const criteria = await CriteriaService.getByGroup(user.uid, selectedGroup.id);
             if (criteria.length === 0) {
                 showAlert('No Criteria', 'Please add criteria first before downloading template');
                 return;
             }
+
             await ExcelHandler.generateTemplate(criteria);
         } catch (error) {
             console.error('Error downloading template:', error);
@@ -144,255 +224,362 @@ export default function InputDataScreen({ navigation }: any) {
         }
     };
 
-    const renderCandidate = ({ item }: { item: Candidate }) => (
-        <View style={styles.candidateCard}>
-            <View style={styles.candidateContent}>
-                {item.imageUri ? (
-                    <Image source={{ uri: item.imageUri }} style={styles.candidateAvatar} />
-                ) : (
-                    <View style={styles.iconContainer}>
-                        <FontAwesome5 name="user" size={24} color={colors.primary} />
-                    </View>
-                )}
-                <View style={styles.candidateInfo}>
-                    <Text style={styles.candidateName}>{item.name}</Text>
-                    <Text style={styles.candidateDate}>
-                        {new Date(item.createdAt).toLocaleDateString()}
-                    </Text>
-                </View>
-            </View>
-            <View style={styles.actions}>
-                <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() =>
+    const renderCandidateItem = ({ item }: { item: Candidate }) => (
+        <SwipeableRow
+            leftActions={[
+                {
+                    id: `edit-${item.id}`,
+                    label: 'Edit',
+                    icon: 'edit',
+                    color: colors.primary,
+                    onPress: () =>
                         navigation.navigate('ManualEntry', {
                             candidateId: item.id,
                             mode: 'edit',
                             groupId: item.groupId,
-                        })
-                    }
-                >
-                    <FontAwesome5 name="edit" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleDelete(item.id, item.name)}
-                >
-                    <FontAwesome5 name="trash" size={20} color={colors.error} />
-                </TouchableOpacity>
+                        }),
+                },
+            ]}
+            rightActions={[
+                {
+                    id: `delete-${item.id}`,
+                    label: 'Delete',
+                    icon: 'trash',
+                    color: colors.error,
+                    onPress: () => handleDeleteCandidate(item.id, item.name),
+                },
+            ]}
+        >
+            <View style={styles.candidateCard}>
+                <View style={styles.candidateContent}>
+                    {item.imageUri ? (
+                        <Image source={{ uri: item.imageUri }} style={styles.candidateAvatar} />
+                    ) : (
+                        <View style={styles.candidateIcon}>
+                            <FontAwesome5 name="user" size={22} color={colors.primary} />
+                        </View>
+                    )}
+                    <View style={styles.candidateInfo}>
+                        <Text style={styles.candidateName}>{item.name}</Text>
+                        <Text style={styles.candidateDate}>
+                            {new Date(item.createdAt).toLocaleDateString()}
+                        </Text>
+                    </View>
+                </View>
             </View>
-        </View>
+        </SwipeableRow>
     );
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Input Data</Text>
-                <Text style={styles.subtitle}>Upload Excel or enter manually</Text>
-            </View>
+    const renderGroupManagerItem = ({ item }: { item: CriteriaGroup }) => {
+        const isActive = selectedGroup?.id === item.id;
 
-            <View style={styles.groupSection}>
-                <View style={styles.groupHeader}>
-                    <Text style={styles.sectionLabel}>Kelompok Input</Text>
-                    <TouchableOpacity
-                        style={styles.addGroupButton}
-                        onPress={() => navigation.navigate('InputGroupForm', { mode: 'add' })}
-                    >
-                        <FontAwesome5 name="plus" size={12} color={colors.primary} />
-                        <Text style={styles.addGroupText}>Tambah Grup Input</Text>
-                    </TouchableOpacity>
+        return (
+            <SwipeableRow
+                leftActions={[
+                    {
+                        id: `activate-${item.id}`,
+                        label: 'Aktifkan',
+                        icon: 'check',
+                        color: colors.success,
+                        onPress: () => handleSelectGroup(item),
+                    },
+                ]}
+                rightActions={[
+                    {
+                        id: `edit-${item.id}`,
+                        label: 'Edit',
+                        icon: 'edit',
+                        color: colors.textSecondary,
+                        onPress: () =>
+                            navigation.navigate('InputGroupForm', {
+                                groupId: item.id,
+                                mode: 'edit',
+                            }),
+                    },
+                    {
+                        id: `duplicate-${item.id}`,
+                        label: 'Copy',
+                        icon: 'copy',
+                        color: colors.primary,
+                        onPress: () => handleDuplicateGroup(item.id, item.name),
+                    },
+                    {
+                        id: `delete-${item.id}`,
+                        label: 'Delete',
+                        icon: 'trash',
+                        color: colors.error,
+                        onPress: () => handleDeleteGroup(item.id, item.name),
+                    },
+                ]}
+            >
+                <View style={[styles.groupManagerCard, isActive && styles.groupManagerCardActive]}>
+                    <View style={styles.groupManagerTopRow}>
+                        <View style={styles.groupManagerTitleWrap}>
+                            <Text style={styles.groupManagerTitle}>{item.name}</Text>
+                            {item.description ? (
+                                <Text style={styles.groupManagerDesc}>{item.description}</Text>
+                            ) : null}
+                        </View>
+                        <View style={[styles.methodBadge, methodBadgeStyle(item.method)]}>
+                            <Text style={styles.methodBadgeText}>{item.method}</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.groupManagerMetaRow}>
+                        <View style={styles.groupMetaChip}>
+                            <FontAwesome5 name="list" size={12} color={colors.textSecondary} />
+                            <Text style={styles.groupMetaChipText}>
+                                {getCriteriaCount(item.id)} criteria
+                            </Text>
+                        </View>
+                        <View style={styles.groupMetaChip}>
+                            <FontAwesome5 name="users" size={12} color={colors.textSecondary} />
+                            <Text style={styles.groupMetaChipText}>
+                                {getCandidateCount(item.id)} candidates
+                            </Text>
+                        </View>
+                        {isActive ? (
+                            <View style={styles.groupMetaChipActive}>
+                                <Text style={styles.groupMetaChipActiveText}>Active</Text>
+                            </View>
+                        ) : null}
+                    </View>
+
                 </View>
-                {groups.length === 0 ? (
-                    <View style={styles.emptyGroupCard}>
-                        <Text style={styles.emptyGroupText}>
-                            Belum ada grup input. Tambahkan di menu Input.
+            </SwipeableRow>
+        );
+    };
+
+    const hasGroups = groups.length > 0;
+
+    const renderCandidatesView = () => {
+        if (!hasGroups) {
+            return (
+                <View style={styles.emptyStateLarge}>
+                    <FontAwesome5 name="layer-group" size={56} color={colors.textTertiary} />
+                    <Text style={styles.emptyTitle}>Belum ada Group Input</Text>
+                    <Text style={styles.emptySubtitle}>Tambah group untuk mulai input kandidat.</Text>
+                </View>
+            );
+        }
+
+        return (
+            <View style={styles.candidatesViewContainer}>
+                <View style={styles.groupPickerPanel}>
+                    <FlatList
+                        data={groups}
+                        horizontal
+                        keyExtractor={(item) => item.id}
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.groupPills}
+                        renderItem={({ item }) => {
+                            const isActive = selectedGroup?.id === item.id;
+                            return (
+                                <TouchableOpacity
+                                    style={[styles.groupPill, isActive && styles.groupPillActive]}
+                                    onPress={() => handleSelectGroup(item)}
+                                >
+                                    <Text
+                                        numberOfLines={1}
+                                        style={[styles.groupPillText, isActive && styles.groupPillTextActive]}
+                                    >
+                                        {item.name}
+                                    </Text>
+                                    <View style={[styles.methodBadge, methodBadgeStyle(item.method)]}>
+                                        <Text style={styles.methodBadgeText}>{item.method}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        }}
+                    />
+                </View>
+
+                <View style={styles.candidatesFullArea}>
+                    <View style={styles.candidatesAreaHeader}>
+                        <Text style={styles.candidatesAreaTitle}>
+                            {selectedGroup ? selectedGroup.name : 'Candidates'}
                         </Text>
+                        {selectedGroup ? (
+                            <Text style={styles.candidatesAreaMeta}>
+                                {getCandidateCount(selectedGroup.id)} kandidat
+                            </Text>
+                        ) : null}
+                    </View>
+
+                    {loading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={colors.primary} />
+                        </View>
+                    ) : selectedGroup && criteriaCount === 0 ? (
+                        <View style={styles.emptyStateInline}>
+                            <Text style={styles.emptyInlineTitle}>Group ini belum punya criteria.</Text>
+                            <Button
+                                title="Buka Criteria"
+                                onPress={() => navigation.navigate('Criteria')}
+                                style={styles.emptyInlineButton}
+                            />
+                        </View>
+                    ) : candidates.length === 0 ? (
+                        <View style={styles.emptyStateInline}>
+                            <Text style={styles.emptyInlineTitle}>Belum ada kandidat</Text>
+                            <Text style={styles.emptyInlineSubtitle}>Tambahkan kandidat untuk mulai penilaian.</Text>
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={candidates}
+                            renderItem={renderCandidateItem}
+                            keyExtractor={(item) => item.id}
+                            style={styles.candidatesList}
+                            contentContainerStyle={styles.candidatesListContent}
+                            showsVerticalScrollIndicator={false}
+                        />
+                    )}
+                </View>
+            </View>
+        );
+    };
+
+    const renderGroupsView = () => {
+        if (!hasGroups && !loading) {
+            return (
+                <View style={styles.emptyStateLarge}>
+                    <FontAwesome5 name="layer-group" size={56} color={colors.textTertiary} />
+                    <Text style={styles.emptyTitle}>Belum ada Group Input</Text>
+                    <Text style={styles.emptySubtitle}>
+                        Buat group baru untuk mulai input kandidat.
+                    </Text>
+                </View>
+            );
+        }
+
+        return (
+            <View style={styles.groupManagerContainer}>
+                <View style={styles.groupManagerHeader}>
+                    <Text style={styles.groupManagerHeaderTitle}>Group Input Management</Text>
+                    <Text style={styles.groupManagerHeaderSubtitle}>Swipe kartu untuk aksi cepat.</Text>
+                </View>
+
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={colors.primary} />
                     </View>
                 ) : (
                     <FlatList
                         data={groups}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
+                        renderItem={renderGroupManagerItem}
                         keyExtractor={(item) => item.id}
-                        contentContainerStyle={styles.groupList}
-                        renderItem={({ item }) => {
-                            const isActive = selectedGroup?.id === item.id;
-                            return (
-                                <View
-                                    style={[
-                                        styles.groupCard,
-                                        isActive && styles.groupCardActive,
-                                    ]}
-                                >
-                                    <TouchableOpacity
-                                        style={styles.groupCardHeader}
-                                        onPress={() => {
-                                            if (!user) return;
-                                            setSelectedGroup(item);
-                                            setLoading(true);
-                                            CandidateService.getAllByGroup(user.uid, item.id)
-                                                .then(setCandidates)
-                                                .catch((error) =>
-                                                    console.error('Error loading candidates:', error)
-                                                )
-                                                .finally(() => setLoading(false));
-                                            CriteriaService.countByGroup(user.uid, item.id)
-                                                .then(setCriteriaCount)
-                                                .catch((error) =>
-                                                    console.error(
-                                                        'Error loading criteria count:',
-                                                        error
-                                                    )
-                                                );
-                                        }}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.groupCardTitle,
-                                                isActive && styles.groupCardTitleActive,
-                                            ]}
-                                        >
-                                            {item.name}
-                                        </Text>
-                                        <View style={[styles.methodBadge, methodBadgeStyle(item.method)]}>
-                                            <Text style={styles.methodBadgeText}>{item.method}</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                    <View style={styles.groupActions}>
-                                        <TouchableOpacity
-                                            style={styles.groupActionButton}
-                                            onPress={() =>
-                                                navigation.navigate('InputGroupForm', {
-                                                    groupId: item.id,
-                                                    mode: 'edit',
-                                                })
-                                            }
-                                        >
-                                            <FontAwesome5
-                                                name="edit"
-                                                size={16}
-                                                color={colors.textSecondary}
-                                            />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={styles.groupActionButton}
-                                            onPress={() => handleDuplicateGroup(item.id, item.name)}
-                                        >
-                                            <FontAwesome5
-                                                name="copy"
-                                                size={16}
-                                                color={colors.textSecondary}
-                                            />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            style={styles.groupActionButton}
-                                            onPress={() => handleDeleteGroup(item.id, item.name)}
-                                        >
-                                            <FontAwesome5 name="trash" size={16} color={colors.error} />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            );
-                        }}
+                        contentContainerStyle={styles.groupManagerList}
+                        showsVerticalScrollIndicator={false}
                     />
                 )}
             </View>
+        );
+    };
 
-            <View style={styles.actionCards}>
-                <TouchableOpacity
-                    style={styles.actionCard}
-                    onPress={() =>
-                        navigation.navigate('ManualEntry', {
-                            mode: 'add',
-                            groupId: selectedGroup?.id,
-                        })
-                    }
-                    disabled={!selectedGroup}
-                >
-                    <View style={[styles.actionIconContainer, { backgroundColor: colors.primary + '20' }]}>
-                        <FontAwesome5 name="edit" size={28} color={colors.primary} />
-                    </View>
-                    <Text style={styles.actionCardTitle}>Manual Entry</Text>
-                    <Text style={styles.actionCardSubtitle}>Add candidate data manually</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.actionCard}
-                    onPress={() =>
-                        navigation.navigate('ExcelUpload', { groupId: selectedGroup?.id })
-                    }
-                    disabled={!selectedGroup}
-                >
-                    <View style={[styles.actionIconContainer, { backgroundColor: colors.benefit + '20' }]}>
-                        <FontAwesome5 name="cloud-upload-alt" size={28} color={colors.benefit} />
-                    </View>
-                    <Text style={styles.actionCardTitle}>Upload Excel</Text>
-                    <Text style={styles.actionCardSubtitle}>Import multiple candidates</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.templateSection}>
-                <Button
-                    title="Download Template"
-                    onPress={handleDownloadTemplate}
-                    variant="outline"
-                    style={styles.templateButton}
-                    disabled={!selectedGroup}
+    return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <View style={styles.headerTextWrap}>
+                    <Text style={styles.title}>Input Data</Text>
+                    <Text style={styles.subtitle}>Kelola kandidat per group input.</Text>
+                </View>
+                <HelpIconButton
+                    onPress={() => navigation.navigate('HelpArticle', { topic: 'input_data' })}
                 />
             </View>
 
-            <View style={styles.listHeader}>
-                <View style={styles.listHeaderContent}>
-                    <Text style={styles.listTitle}>
-                        {selectedGroup ? `${selectedGroup.name} • ` : ''}Candidates ({candidates.length})
-                    </Text>
-                    {selectedGroup ? (
-                        <View
-                            style={[
-                                styles.methodBadge,
-                                methodBadgeStyle(selectedGroup.method),
-                            ]}
-                        >
-                            <Text style={styles.methodBadgeText}>
-                                {selectedGroup.method}
-                            </Text>
-                        </View>
-                    ) : null}
-                </View>
-                {selectedGroup ? (
-                    <Text style={styles.methodHintText}>
-                        {selectedGroup.method === 'WPM'
-                            ? 'WPM: nilai input harus lebih dari 0.'
-                            : 'SAW: nilai dinormalisasi (benefit/max, cost/min).'}
-                    </Text>
-                ) : null}
-            </View>
-
-            {selectedGroup && criteriaCount === 0 ? (
-                <View style={styles.emptyState}>
-                    <FontAwesome5 name="users" size={64} color={colors.textTertiary} />
-                    <Text style={styles.emptyText}>No criteria configured</Text>
-                    <Text style={styles.emptySubtext}>
-                        Add criteria first before adding candidate data
-                    </Text>
-                    <Button
-                        title="Go to Criteria"
-                        onPress={() => navigation.navigate('Criteria')}
-                        style={styles.emptyButton}
+            <View style={styles.viewSwitcher}>
+                <TouchableOpacity
+                    style={[
+                        styles.viewSwitcherButton,
+                        activeView === 'candidates' && styles.viewSwitcherButtonActive,
+                    ]}
+                    onPress={() => setActiveView('candidates')}
+                >
+                    <FontAwesome5
+                        name="users"
+                        size={14}
+                        color={activeView === 'candidates' ? colors.primary : colors.textSecondary}
                     />
-                </View>
-            ) : candidates.length === 0 ? (
-                <View style={styles.emptyList}>
-                    <Text style={styles.emptyListText}>No candidates yet</Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={candidates}
-                    renderItem={renderCandidate}
-                    keyExtractor={(item) => item.id.toString()}
-                    contentContainerStyle={styles.list}
-                />
-            )}
+                    <Text
+                        style={[
+                            styles.viewSwitcherText,
+                            activeView === 'candidates' && styles.viewSwitcherTextActive,
+                        ]}
+                    >
+                        Candidates
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[
+                        styles.viewSwitcherButton,
+                        activeView === 'groups' && styles.viewSwitcherButtonActive,
+                    ]}
+                    onPress={() => setActiveView('groups')}
+                >
+                    <FontAwesome5
+                        name="layer-group"
+                        size={14}
+                        color={activeView === 'groups' ? colors.primary : colors.textSecondary}
+                    />
+                    <Text
+                        style={[
+                            styles.viewSwitcherText,
+                            activeView === 'groups' && styles.viewSwitcherTextActive,
+                        ]}
+                    >
+                        Group Manager
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
+            <View style={styles.contentArea}>
+                {activeView === 'candidates' ? renderCandidatesView() : renderGroupsView()}
+            </View>
+
+            <BottomActionBar>
+                {activeView === 'candidates' ? (
+                    hasGroups ? (
+                        <>
+                            <Button
+                                title="Manual Entry"
+                                onPress={() =>
+                                    navigation.navigate('ManualEntry', {
+                                        mode: 'add',
+                                        groupId: selectedGroup?.id,
+                                    })
+                                }
+                                disabled={!selectedGroup || criteriaCount === 0}
+                            />
+                            <Button
+                                title="Upload Excel"
+                                onPress={() => navigation.navigate('ExcelUpload', { groupId: selectedGroup?.id })}
+                                variant="secondary"
+                                disabled={!selectedGroup || criteriaCount === 0}
+                            />
+                        </>
+                    ) : (
+                        <Button
+                            title="Tambah Group Input"
+                            onPress={() => navigation.navigate('InputGroupForm', { mode: 'add' })}
+                        />
+                    )
+                ) : (
+                    <>
+                        <Button
+                            title="Tambah Group Input"
+                            onPress={() => navigation.navigate('InputGroupForm', { mode: 'add' })}
+                        />
+                        <Button
+                            title="Download Template"
+                            onPress={handleDownloadTemplate}
+                            variant="outline"
+                            disabled={!selectedGroup || criteriaCount === 0}
+                        />
+                    </>
+                )}
+            </BottomActionBar>
         </SafeAreaView>
     );
 }
@@ -404,241 +591,192 @@ const styles = StyleSheet.create({
     },
 
     header: {
-        padding: spacing.lg,
+        paddingHorizontal: spacing.lg,
         paddingTop: spacing.xl,
+        paddingBottom: spacing.md,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: spacing.md,
+    },
+
+    headerTextWrap: {
+        flex: 1,
     },
 
     title: {
         fontSize: typography['2xl'],
         fontWeight: typography.bold,
         color: colors.textPrimary,
-        marginBottom: spacing.xs,
     },
 
     subtitle: {
-        fontSize: typography.base,
+        marginTop: spacing.xs,
+        fontSize: typography.sm,
         color: colors.textSecondary,
     },
 
-    groupSection: {
-        paddingHorizontal: spacing.lg,
+    viewSwitcher: {
+        marginHorizontal: spacing.lg,
         marginBottom: spacing.md,
-    },
-
-    sectionLabel: {
-        fontSize: typography.sm,
-        fontWeight: typography.semibold,
-        color: colors.textSecondary,
-    },
-
-    groupHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.sm,
-    },
-
-    addGroupButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.xs,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        borderRadius: borderRadius.lg,
-        borderWidth: 1,
-        borderColor: colors.primary,
-        backgroundColor: colors.primary + '10',
-    },
-
-    addGroupText: {
-        fontSize: typography.xs,
-        color: colors.primary,
-        fontWeight: typography.semibold,
-    },
-
-    groupList: {
-        paddingVertical: spacing.xs,
-        gap: spacing.sm,
-    },
-
-    groupCard: {
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.lg,
         backgroundColor: colors.surface,
+        borderRadius: borderRadius.xl,
         borderWidth: 1,
         borderColor: colors.border,
-        minWidth: 180,
-    },
-
-    groupCardActive: {
-        backgroundColor: colors.primary + '15',
-        borderColor: colors.primary,
-    },
-
-    groupCardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: spacing.sm,
-    },
-
-    groupCardTitle: {
-        fontSize: typography.sm,
-        color: colors.textSecondary,
-        fontWeight: typography.medium,
-        flex: 1,
-        marginRight: spacing.sm,
-    },
-
-    groupCardTitleActive: {
-        color: colors.primary,
-        fontWeight: typography.semibold,
-    },
-
-    groupActions: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-    },
-
-    groupActionButton: {
         padding: spacing.xs,
-    },
-
-    emptyGroupCard: {
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-
-    emptyGroupText: {
-        fontSize: typography.sm,
-        color: colors.textTertiary,
-    },
-
-    actionCards: {
         flexDirection: 'row',
-        paddingHorizontal: spacing.lg,
-        gap: spacing.md,
-        marginBottom: spacing.lg,
-    },
-
-    actionCard: {
-        flex: 1,
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
-        alignItems: 'center',
+        gap: spacing.sm,
         ...shadows.sm,
     },
 
-    actionIconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        justifyContent: 'center',
+    viewSwitcherButton: {
+        flex: 1,
+        minHeight: 46,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: 'transparent',
+        flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: spacing.md,
+        justifyContent: 'center',
+        gap: spacing.xs,
     },
 
-    actionCardTitle: {
-        fontSize: typography.base,
-        fontWeight: typography.semibold,
-        color: colors.textPrimary,
-        marginBottom: spacing.xs,
+    viewSwitcherButtonActive: {
+        backgroundColor: colors.primary + '12',
+        borderColor: colors.primary + '35',
     },
 
-    actionCardSubtitle: {
+    viewSwitcherText: {
         fontSize: typography.sm,
         color: colors.textSecondary,
-        textAlign: 'center',
+        fontWeight: typography.semibold,
     },
 
-    templateSection: {
+    viewSwitcherTextActive: {
+        color: colors.primary,
+    },
+
+    contentArea: {
+        flex: 1,
+    },
+
+    candidatesViewContainer: {
+        flex: 1,
         paddingHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
+        paddingBottom: spacing.sm,
+        gap: spacing.sm,
     },
 
-    templateButton: {
-        marginBottom: 0,
+    groupPickerPanel: {
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.xl,
+        borderWidth: 1,
+        borderColor: colors.border,
+        paddingVertical: spacing.sm,
+        ...shadows.sm,
     },
 
-    listHeader: {
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
+    groupPills: {
+        paddingHorizontal: spacing.sm,
+        gap: spacing.sm,
+    },
+
+    groupPill: {
+        minWidth: 170,
+        minHeight: 48,
+        borderRadius: borderRadius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.background,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+    },
+
+    groupPillActive: {
+        backgroundColor: colors.primary + '12',
+        borderColor: colors.primary,
+    },
+
+    groupPillText: {
+        flex: 1,
+        fontSize: typography.sm,
+        color: colors.textSecondary,
+        fontWeight: typography.semibold,
+    },
+
+    groupPillTextActive: {
+        color: colors.primary,
+    },
+
+    candidatesFullArea: {
+        flex: 1,
+        borderRadius: borderRadius.xl,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: 'hidden',
+        ...shadows.sm,
+    },
+
+    candidatesAreaHeader: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
 
-    listHeaderContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+    candidatesAreaTitle: {
+        fontSize: typography.base,
+        fontWeight: typography.semibold,
+        color: colors.textPrimary,
+    },
+
+    candidatesAreaMeta: {
+        fontSize: typography.xs,
+        color: colors.textSecondary,
+        fontWeight: typography.semibold,
+    },
+
+    candidatesList: {
+        flex: 1,
+    },
+
+    candidatesListContent: {
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing['3xl'],
         gap: spacing.sm,
     },
 
-    listTitle: {
-        fontSize: typography.lg,
-        fontWeight: typography.semibold,
-        color: colors.textPrimary,
-    },
-
-    methodBadge: {
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        borderRadius: borderRadius.full,
-    },
-
-    methodBadgeWpm: {
-        backgroundColor: colors.primary + '20',
-    },
-
-    methodBadgeSaw: {
-        backgroundColor: colors.benefit + '20',
-    },
-
-    methodBadgeText: {
-        fontSize: typography.xs,
-        fontWeight: typography.semibold,
-        color: colors.textPrimary,
-    },
-
-    methodHintText: {
-        marginTop: spacing.xs,
-        fontSize: typography.xs,
-        color: colors.textSecondary,
-    },
-
-    list: {
-        padding: spacing.lg,
-    },
-
     candidateCard: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
-        padding: spacing.lg,
-        marginBottom: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.md,
         ...shadows.sm,
     },
 
     candidateContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        flex: 1,
     },
 
-    iconContainer: {
+    candidateIcon: {
         width: 48,
         height: 48,
         borderRadius: 24,
         backgroundColor: colors.primary + '20',
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
         marginRight: spacing.md,
     },
 
@@ -665,49 +803,179 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
     },
 
-    actions: {
+    groupManagerContainer: {
+        flex: 1,
+    },
+
+    groupManagerHeader: {
+        marginHorizontal: spacing.lg,
+        marginBottom: spacing.sm,
+    },
+
+    groupManagerHeaderTitle: {
+        fontSize: typography.lg,
+        fontWeight: typography.bold,
+        color: colors.textPrimary,
+    },
+
+    groupManagerHeaderSubtitle: {
+        marginTop: spacing.xs,
+        fontSize: typography.sm,
+        color: colors.textSecondary,
+    },
+
+    groupManagerList: {
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing['4xl'],
+        gap: spacing.md,
+    },
+
+    groupManagerCard: {
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: borderRadius.xl,
+        padding: spacing.lg,
+        ...shadows.sm,
+    },
+
+    groupManagerCardActive: {
+        borderColor: colors.primary,
+        backgroundColor: colors.primary + '10',
+    },
+
+    groupManagerTopRow: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: spacing.md,
+    },
+
+    groupManagerTitleWrap: {
+        flex: 1,
+    },
+
+    groupManagerTitle: {
+        fontSize: typography.base,
+        fontWeight: typography.bold,
+        color: colors.textPrimary,
+    },
+
+    groupManagerDesc: {
+        marginTop: spacing.xs,
+        fontSize: typography.sm,
+        color: colors.textSecondary,
+    },
+
+    groupManagerMetaRow: {
+        marginTop: spacing.md,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: spacing.sm,
     },
 
-    actionButton: {
-        padding: spacing.sm,
+    groupMetaChip: {
+        minHeight: 32,
+        borderRadius: borderRadius.full,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.background,
+        paddingHorizontal: spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
     },
 
-    emptyState: {
+    groupMetaChipText: {
+        fontSize: typography.xs,
+        color: colors.textSecondary,
+        fontWeight: typography.semibold,
+    },
+
+    groupMetaChipActive: {
+        minHeight: 32,
+        borderRadius: borderRadius.full,
+        backgroundColor: colors.primary,
+        paddingHorizontal: spacing.sm,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    groupMetaChipActiveText: {
+        fontSize: typography.xs,
+        color: colors.surface,
+        fontWeight: typography.bold,
+    },
+
+    methodBadge: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.full,
+    },
+
+    methodBadgeWpm: {
+        backgroundColor: colors.primary + '20',
+    },
+
+    methodBadgeSaw: {
+        backgroundColor: colors.benefit + '20',
+    },
+
+    methodBadgeText: {
+        fontSize: typography.xs,
+        fontWeight: typography.bold,
+        color: colors.textPrimary,
+    },
+
+    loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: spacing.xl,
     },
 
-    emptyText: {
+    emptyStateLarge: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xl,
+    },
+
+    emptyTitle: {
+        marginTop: spacing.lg,
         fontSize: typography.lg,
         fontWeight: typography.semibold,
         color: colors.textSecondary,
-        marginTop: spacing.lg,
     },
 
-    emptySubtext: {
+    emptySubtitle: {
+        marginTop: spacing.sm,
         fontSize: typography.base,
         color: colors.textTertiary,
-        marginTop: spacing.xs,
         textAlign: 'center',
     },
 
-    emptyButton: {
-        marginTop: spacing.xl,
-    },
-
-    emptyList: {
+    emptyStateInline: {
         flex: 1,
-        justifyContent: 'center',
         alignItems: 'center',
-        padding: spacing.xl,
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xl,
     },
 
-    emptyListText: {
+    emptyInlineTitle: {
         fontSize: typography.base,
+        fontWeight: typography.semibold,
+        color: colors.textSecondary,
+        textAlign: 'center',
+    },
+
+    emptyInlineSubtitle: {
+        marginTop: spacing.xs,
+        fontSize: typography.sm,
         color: colors.textTertiary,
+        textAlign: 'center',
+    },
+
+    emptyInlineButton: {
+        marginTop: spacing.lg,
     },
 });

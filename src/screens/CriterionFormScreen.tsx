@@ -12,6 +12,9 @@ import {
 import { colors, typography, spacing, borderRadius } from '../styles/theme';
 import { Button } from '../components/common/Button';
 import { ScaleSlider } from '../components/common/ScaleSlider';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { SectionDisclosure } from '../components/common/SectionDisclosure';
+import { MotionView } from '../components/common/MotionView';
 import { DataType, ImpactType } from '../types';
 import { CriteriaService } from '../database/services/CriteriaService';
 import { useAuth } from '../contexts/AuthContext';
@@ -96,122 +99,142 @@ export default function CriterionFormScreen({ route, navigation }: any) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                <Text style={styles.sectionTitle}>Name</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="e.g. Leadership Potential"
-                    placeholderTextColor={colors.textTertiary}
-                    value={name}
-                    onChangeText={setName}
-                />
+            <MotionView style={styles.motionContainer}>
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                >
+                    <Text style={styles.sectionTitle}>Name</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g. Leadership Potential"
+                        placeholderTextColor={colors.textTertiary}
+                        value={name}
+                        onChangeText={setName}
+                    />
 
-                <Text style={styles.sectionTitle}>Data Type</Text>
-                <View style={styles.optionGroup}>
-                    <TouchableOpacity
-                        style={[
-                            styles.optionButton,
-                            dataType === 'NUMERIC' && styles.optionButtonSelected,
-                        ]}
-                        onPress={() => setDataType('NUMERIC')}
+                    <SectionDisclosure
+                        title="Data Type"
+                        subtitle="Pilih tipe nilai yang akan diinput."
+                        iconName="sliders-h"
+                        defaultExpanded
+                        containerStyle={styles.disclosureSection}
                     >
-                        <Text style={styles.optionIcon}>#</Text>
-                        <Text
-                            style={[
-                                styles.optionText,
-                                dataType === 'NUMERIC' && styles.optionTextSelected,
-                            ]}
-                        >
-                            Numeric
-                        </Text>
-                    </TouchableOpacity>
+                        <View style={styles.optionGroup}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.optionButton,
+                                    dataType === 'NUMERIC' && styles.optionButtonSelected,
+                                ]}
+                                onPress={() => setDataType('NUMERIC')}
+                            >
+                                <Text style={styles.optionIcon}>#</Text>
+                                <Text
+                                    style={[
+                                        styles.optionText,
+                                        dataType === 'NUMERIC' && styles.optionTextSelected,
+                                    ]}
+                                >
+                                    Numeric
+                                </Text>
+                            </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={[
-                            styles.optionButton,
-                            dataType === 'SCALE' && styles.optionButtonSelected,
-                        ]}
-                        onPress={() => setDataType('SCALE')}
+                            <TouchableOpacity
+                                style={[
+                                    styles.optionButton,
+                                    dataType === 'SCALE' && styles.optionButtonSelected,
+                                ]}
+                                onPress={() => setDataType('SCALE')}
+                            >
+                                <Text style={styles.optionIcon}>⚖</Text>
+                                <Text
+                                    style={[
+                                        styles.optionText,
+                                        dataType === 'SCALE' && styles.optionTextSelected,
+                                    ]}
+                                >
+                                    Scale (1-5)
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {dataType === 'SCALE' && (
+                            <View style={styles.scalePreview}>
+                                <Text style={styles.scalePreviewLabel}>Scale Preview:</Text>
+                                <ScaleSlider value={scalePreview} onChange={setScalePreview} />
+                            </View>
+                        )}
+                    </SectionDisclosure>
+
+                    <SectionDisclosure
+                        title="Impact Type"
+                        subtitle="Tentukan apakah nilai tinggi lebih baik atau lebih buruk."
+                        iconName="exchange-alt"
+                        containerStyle={styles.disclosureSection}
                     >
-                        <Text style={styles.optionIcon}>⚖</Text>
-                        <Text
-                            style={[
-                                styles.optionText,
-                                dataType === 'SCALE' && styles.optionTextSelected,
-                            ]}
-                        >
-                            Scale (1-5)
+                        <View style={styles.optionGroup}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.optionButton,
+                                    impactType === 'BENEFIT' && styles.optionButtonSelected,
+                                ]}
+                                onPress={() => setImpactType('BENEFIT')}
+                            >
+                                <Text style={styles.optionIcon}>↑</Text>
+                                <Text
+                                    style={[
+                                        styles.optionText,
+                                        impactType === 'BENEFIT' && styles.optionTextSelected,
+                                    ]}
+                                >
+                                    Benefit
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.optionButton,
+                                    impactType === 'COST' && styles.optionButtonSelected,
+                                ]}
+                                onPress={() => setImpactType('COST')}
+                            >
+                                <Text style={styles.optionIcon}>↓</Text>
+                                <Text
+                                    style={[
+                                        styles.optionText,
+                                        impactType === 'COST' && styles.optionTextSelected,
+                                    ]}
+                                >
+                                    Cost
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.helpText}>
+                            {impactType === 'BENEFIT'
+                                ? 'Higher values are better (e.g., KPI Score, Experience)'
+                                : 'Lower values are better (e.g., Ethics Breach, Attrition Risk)'}
                         </Text>
-                    </TouchableOpacity>
-                </View>
+                    </SectionDisclosure>
 
-                {dataType === 'SCALE' && (
-                    <View style={styles.scalePreview}>
-                        <Text style={styles.scalePreviewLabel}>Scale Preview:</Text>
-                        <ScaleSlider value={scalePreview} onChange={setScalePreview} />
-                    </View>
-                )}
+                    <Text style={styles.sectionTitle}>Weight (%)</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g. 25"
+                        placeholderTextColor={colors.textTertiary}
+                        keyboardType="numeric"
+                        value={weight}
+                        onChangeText={setWeight}
+                    />
+                    <Text style={styles.helpText}>
+                        Total bobot untuk grup harus 100%.
+                    </Text>
+                </ScrollView>
+            </MotionView>
 
-                <Text style={styles.sectionTitle}>Impact Type</Text>
-                <View style={styles.optionGroup}>
-                    <TouchableOpacity
-                        style={[
-                            styles.optionButton,
-                            impactType === 'BENEFIT' && styles.optionButtonSelected,
-                        ]}
-                        onPress={() => setImpactType('BENEFIT')}
-                    >
-                        <Text style={styles.optionIcon}>↑</Text>
-                        <Text
-                            style={[
-                                styles.optionText,
-                                impactType === 'BENEFIT' && styles.optionTextSelected,
-                            ]}
-                        >
-                            Benefit
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.optionButton,
-                            impactType === 'COST' && styles.optionButtonSelected,
-                        ]}
-                        onPress={() => setImpactType('COST')}
-                    >
-                        <Text style={styles.optionIcon}>↓</Text>
-                        <Text
-                            style={[
-                                styles.optionText,
-                                impactType === 'COST' && styles.optionTextSelected,
-                            ]}
-                        >
-                            Cost
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                <Text style={styles.helpText}>
-                    {impactType === 'BENEFIT'
-                        ? 'Higher values are better (e.g., KPI Score, Experience)'
-                        : 'Lower values are better (e.g., Ethics Breach, Attrition Risk)'}
-                </Text>
-
-                <Text style={styles.sectionTitle}>Weight (%)</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 25"
-                    placeholderTextColor={colors.textTertiary}
-                    keyboardType="numeric"
-                    value={weight}
-                    onChangeText={setWeight}
-                />
-                <Text style={styles.helpText}>
-                    Total bobot untuk grup harus 100%.
-                </Text>
-            </ScrollView>
-
-            <View style={styles.footer}>
+            <BottomActionBar>
                 <Button
                     title={isEditMode ? 'Update Criterion' : 'Add Criterion'}
                     onPress={handleSave}
@@ -223,7 +246,7 @@ export default function CriterionFormScreen({ route, navigation }: any) {
                     onPress={() => navigation.goBack()}
                     variant="outline"
                 />
-            </View>
+            </BottomActionBar>
         </SafeAreaView>
     );
 }
@@ -235,6 +258,10 @@ const styles = StyleSheet.create({
     },
 
     scrollView: {
+        flex: 1,
+    },
+
+    motionContainer: {
         flex: 1,
     },
 
@@ -258,6 +285,10 @@ const styles = StyleSheet.create({
         color: colors.textPrimary,
         borderWidth: 1,
         borderColor: colors.border,
+    },
+
+    disclosureSection: {
+        marginTop: spacing.md,
     },
 
     optionGroup: {
@@ -315,14 +346,6 @@ const styles = StyleSheet.create({
         color: colors.textTertiary,
         marginTop: spacing.sm,
         fontStyle: 'italic',
-    },
-
-    footer: {
-        padding: spacing.lg,
-        gap: spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        backgroundColor: colors.surface,
     },
 
     saveButton: {

@@ -9,8 +9,9 @@ import {
 import { FontAwesome5 } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius, shadows } from '../../styles/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import { HelpIconButton } from '../../components/common/HelpIconButton';
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }: any) {
     const { signInWithGoogle } = useAuth();
     const [loading, setLoading] = React.useState(false);
 
@@ -28,6 +29,10 @@ export default function LoginScreen() {
 
     return (
         <View style={styles.container}>
+            <HelpIconButton
+                style={styles.helpButton}
+                onPress={() => navigation.navigate('HelpArticle', { topic: 'login' })}
+            />
             <View style={styles.content}>
                 <View style={styles.logoContainer}>
                     <FontAwesome5 name="trophy" size={80} color={colors.primary} />
@@ -75,6 +80,13 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
+    },
+
+    helpButton: {
+        position: 'absolute',
+        top: spacing.xl,
+        right: spacing.lg,
+        zIndex: 20,
     },
 
     content: {

@@ -14,6 +14,11 @@ import { CriteriaService } from '../database/services/CriteriaService';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { useAuth } from '../contexts/AuthContext';
 import { WeightSlider } from '../components/common/WeightSlider';
+import { Button } from '../components/common/Button';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { HelpIconButton } from '../components/common/HelpIconButton';
+import { SectionDisclosure } from '../components/common/SectionDisclosure';
+import { SwipeableRow } from '../components/common/SwipeableRow';
 import { confirmDialog, showAlert } from '../utils/dialog';
 
 export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
@@ -22,7 +27,6 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
     const [criteria, setCriteria] = useState<Criterion[]>([]);
     const [group, setGroup] = useState<CriteriaGroup | null>(null);
     const [loading, setLoading] = useState(true);
-    const [lockedCriteriaIds, setLockedCriteriaIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         loadGroupData();
@@ -80,20 +84,42 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
     const totalWeight = criteria.reduce((sum, criterion) => sum + (criterion.weight ?? 0), 0);
     const isWeightValid = Math.abs(totalWeight - 100) < 0.01;
 
-    const handleToggleLock = (criterionId: string) => {
-        setLockedCriteriaIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(criterionId)) {
-                next.delete(criterionId);
-            } else {
-                next.add(criterionId);
-            }
-            return next;
-        });
+    const handleToggleLock = async (criterionId: string) => {
+        if (!user) return;
+
+        const targetCriterion = criteria.find((criterion) => criterion.id === criterionId);
+        if (!targetCriterion) return;
+
+        const nextLocked = !(targetCriterion.isWeightLocked ?? false);
+
+        setCriteria((prev) =>
+            prev.map((criterion) =>
+                criterion.id === criterionId
+                    ? { ...criterion, isWeightLocked: nextLocked }
+                    : criterion
+            )
+        );
+
+        try {
+            await CriteriaService.updateWeightLock(user.uid, criterionId, nextLocked);
+        } catch (error) {
+            console.error('Error updating weight lock:', error);
+            setCriteria((prev) =>
+                prev.map((criterion) =>
+                    criterion.id === criterionId
+                        ? { ...criterion, isWeightLocked: !nextLocked }
+                        : criterion
+                )
+            );
+            showAlert('Error', 'Failed to update lock status');
+        }
     };
 
     const handleWeightChange = async (criterionId: string, nextWeight: number) => {
         if (!user) return;
+        if (criteria.find((criterion) => criterion.id === criterionId)?.isWeightLocked) {
+            return;
+        }
         const normalizedWeight = Math.max(1, Math.min(100, Math.round(nextWeight)));
         setCriteria((prev) =>
             prev.map((criterion) =>
@@ -111,10 +137,10 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
     const handleAutoDistribute = async () => {
         if (!user) return;
         const lockedCriteria = criteria.filter((criterion) =>
-            lockedCriteriaIds.has(criterion.id)
+            criterion.isWeightLocked
         );
         const unlockedCriteria = criteria.filter(
-            (criterion) => !lockedCriteriaIds.has(criterion.id)
+            (criterion) => !criterion.isWeightLocked
         );
 
         if (unlockedCriteria.length === 0) {
@@ -136,7 +162,7 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
         const remainder = remainingWeight - baseWeight * unlockedCriteria.length;
 
         const nextCriteria = criteria.map((criterion) => {
-            if (lockedCriteriaIds.has(criterion.id)) {
+            if (criterion.isWeightLocked) {
                 return criterion;
             }
             const unlockIndex = unlockedCriteria.findIndex(
@@ -151,7 +177,7 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
         try {
             await Promise.all(
                 nextCriteria
-                    .filter((criterion) => !lockedCriteriaIds.has(criterion.id))
+                    .filter((criterion) => !criterion.isWeightLocked)
                     .map((criterion) =>
                         CriteriaService.updateWeight(user.uid, criterion.id, criterion.weight ?? 0)
                     )
@@ -166,9 +192,9 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
     const renderCriterion = ({ item }: { item: Criterion }) => {
         const isBenefit = item.impactType === 'BENEFIT';
         const iconColor = isBenefit ? colors.benefit : colors.cost;
-        const isLocked = lockedCriteriaIds.has(item.id);
+        const isLocked = !!item.isWeightLocked;
 
-        return (
+        const card = (
             <View style={styles.criterionCard}>
                 <View style={styles.criterionContent}>
                     <View style={[styles.iconContainer, { backgroundColor: iconColor + '20' }]}>
@@ -184,6 +210,12 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
                             <Text style={styles.metaText}>{item.impactType}</Text>
                             <Text style={styles.metaSeparator}>•</Text>
                             <Text style={styles.metaText}>{item.dataType}</Text>
+                            {isLocked ? (
+                                <>
+                                    <Text style={styles.metaSeparator}>•</Text>
+                                    <Text style={styles.lockedMeta}>Locked</Text>
+                                </>
+                            ) : null}
                         </View>
                         <Text style={styles.weightText}>{item.weight}%</Text>
                         <WeightSlider
@@ -199,39 +231,49 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
                         />
                     </View>
                 </View>
-                {!isReadOnly ? (
-                    <View style={styles.actions}>
-                        <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() => handleToggleLock(item.id)}
-                        >
-                            <FontAwesome5
-                                name={isLocked ? 'lock' : 'lock-open'}
-                                size={18}
-                                color={isLocked ? colors.textSecondary : colors.primary}
-                            />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() =>
-                                navigation.navigate('CriterionForm', {
-                                    criterionId: item.id,
-                                    groupId,
-                                    mode: 'edit',
-                                })
-                            }
-                        >
-                            <FontAwesome5 name="edit" size={20} color={colors.textSecondary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() => handleDelete(item.id, item.name)}
-                        >
-                            <FontAwesome5 name="trash" size={20} color={colors.error} />
-                        </TouchableOpacity>
-                    </View>
-                ) : null}
             </View>
+        );
+
+        if (isReadOnly) {
+            return <View style={styles.criterionRow}>{card}</View>;
+        }
+
+        return (
+            <SwipeableRow
+                containerStyle={styles.criterionRow}
+                leftActions={[
+                    {
+                        id: 'lock',
+                        label: isLocked ? 'Unlock' : 'Lock',
+                        icon: isLocked ? 'lock-open' : 'lock',
+                        color: colors.primary,
+                        onPress: () => handleToggleLock(item.id),
+                    },
+                ]}
+                rightActions={[
+                    {
+                        id: 'edit',
+                        label: 'Edit',
+                        icon: 'edit',
+                        color: colors.textSecondary,
+                        onPress: () =>
+                            navigation.navigate('CriterionForm', {
+                                criterionId: item.id,
+                                groupId,
+                                mode: 'edit',
+                            }),
+                    },
+                    {
+                        id: 'delete',
+                        label: 'Delete',
+                        icon: 'trash',
+                        color: colors.error,
+                        onPress: () => handleDelete(item.id, item.name),
+                    },
+                ]}
+            >
+                {card}
+            </SwipeableRow>
         );
     };
 
@@ -241,15 +283,21 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={() => navigation.goBack()}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                     <FontAwesome5 name="chevron-left" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
-                <View>
+                <View style={styles.headerTextWrap}>
                     <Text style={styles.title}>{group?.name ?? 'Criteria Group'}</Text>
                     <Text style={styles.subtitle}>
                         {group?.description || 'Manage criteria and weights.'}
                     </Text>
                 </View>
+                <HelpIconButton
+                    onPress={() =>
+                        navigation.navigate('HelpArticle', { topic: 'criteria_group_detail' })
+                    }
+                />
             </View>
 
             <View style={[styles.totalCard, isWeightValid && styles.totalCardValid]}>
@@ -274,6 +322,20 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
                 ) : null}
             </View>
 
+            <SectionDisclosure
+                title="Panduan Interaksi"
+                subtitle="Gunakan gestur untuk edit cepat."
+                iconName="hand-paper"
+                containerStyle={styles.guideSection}
+            >
+                <Text style={styles.guideText}>
+                    Geser kartu kriteria untuk lock/unlock, edit, atau hapus.
+                </Text>
+                <Text style={styles.guideText}>
+                    Bobot total harus tepat 100% sebelum hasil dapat dihitung.
+                </Text>
+            </SectionDisclosure>
+
             {criteria.length === 0 && !loading ? (
                 <View style={styles.emptyState}>
                     <FontAwesome5 name="list" size={64} color={colors.textTertiary} />
@@ -292,12 +354,12 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
             )}
 
             {!isReadOnly ? (
-                <TouchableOpacity
-                    style={styles.fab}
-                    onPress={() => navigation.navigate('CriterionForm', { mode: 'add', groupId })}
-                >
-                    <FontAwesome5 name="plus" size={28} color={colors.surface} />
-                </TouchableOpacity>
+                <BottomActionBar>
+                    <Button
+                        title="Tambah Criterion"
+                        onPress={() => navigation.navigate('CriterionForm', { mode: 'add', groupId })}
+                    />
+                </BottomActionBar>
             ) : null}
         </SafeAreaView>
     );
@@ -315,6 +377,10 @@ const styles = StyleSheet.create({
         padding: spacing.lg,
         paddingTop: spacing.xl,
         alignItems: 'center',
+    },
+
+    headerTextWrap: {
+        flex: 1,
     },
 
     backButton: {
@@ -341,7 +407,7 @@ const styles = StyleSheet.create({
 
     totalCard: {
         marginHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
         padding: spacing.lg,
         backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
@@ -402,6 +468,16 @@ const styles = StyleSheet.create({
         marginTop: spacing.xs,
     },
 
+    guideSection: {
+        marginHorizontal: spacing.lg,
+        marginBottom: spacing.lg,
+    },
+
+    guideText: {
+        fontSize: typography.sm,
+        color: colors.textSecondary,
+    },
+
     list: {
         padding: spacing.lg,
         paddingTop: 0,
@@ -414,8 +490,11 @@ const styles = StyleSheet.create({
         backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
-        marginBottom: spacing.md,
         ...shadows.sm,
+    },
+
+    criterionRow: {
+        marginBottom: spacing.md,
     },
 
     criterionContent: {
@@ -454,6 +533,12 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
     },
 
+    lockedMeta: {
+        fontSize: typography.sm,
+        color: colors.primary,
+        fontWeight: typography.semibold,
+    },
+
     metaSeparator: {
         fontSize: typography.sm,
         color: colors.textTertiary,
@@ -469,15 +554,6 @@ const styles = StyleSheet.create({
 
     weightSlider: {
         marginTop: spacing.sm,
-    },
-
-    actions: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-    },
-
-    actionButton: {
-        padding: spacing.sm,
     },
 
     emptyState: {
@@ -501,16 +577,4 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    fab: {
-        position: 'absolute',
-        right: spacing.lg,
-        bottom: spacing.lg,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: colors.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...shadows.lg,
-    },
 });

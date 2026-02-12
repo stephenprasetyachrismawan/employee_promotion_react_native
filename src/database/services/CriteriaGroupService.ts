@@ -204,6 +204,7 @@ export class CriteriaGroupService {
                 dataType: criterion.dataType,
                 impactType: criterion.impactType,
                 weight: criterion.weight ?? 0,
+                isWeightLocked: criterion.isWeightLocked ?? false,
                 createdAt: Timestamp.now(),
             },
         }));
@@ -246,6 +247,7 @@ export class CriteriaGroupService {
                     dataType: criterion.dataType,
                     impactType: criterion.impactType,
                     weight: criterion.weight ?? 0,
+                    isWeightLocked: criterion.isWeightLocked ?? false,
                     createdAt: Timestamp.now(),
                 },
             })),

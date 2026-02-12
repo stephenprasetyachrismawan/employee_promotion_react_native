@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../styles/theme';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,11 +16,14 @@ import HomeScreen from '../screens/HomeScreen';
 import CriteriaNavigator from './CriteriaNavigator';
 import InputDataNavigator from './InputDataNavigator';
 import ResultsScreen from '../screens/ResultsScreen';
+import HelpArticleScreen from '../screens/HelpArticleScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainTabs() {
+    const insets = useSafeAreaInsets();
+
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -40,9 +44,21 @@ function MainTabs() {
                 },
                 tabBarActiveTintColor: colors.primary,
                 tabBarInactiveTintColor: colors.textTertiary,
+                tabBarHideOnKeyboard: true,
                 tabBarStyle: {
-                    paddingBottom: 8,
-                    height: 64,
+                    paddingTop: 8,
+                    paddingBottom: Math.max(insets.bottom, 8),
+                    height: 72 + Math.max(insets.bottom, 8),
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border,
+                    backgroundColor: colors.surface,
+                },
+                tabBarItemStyle: {
+                    paddingVertical: 4,
+                },
+                tabBarLabelStyle: {
+                    fontSize: 12,
+                    fontWeight: '600',
                 },
                 headerShown: false,
             })}
@@ -68,12 +84,36 @@ export default function AppNavigator() {
 
     return (
         <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Navigator
+                screenOptions={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    fullScreenGestureEnabled: true,
+                    animation: 'slide_from_right',
+                    animationDuration: 260,
+                    animationMatchesGesture: true,
+                    contentStyle: {
+                        backgroundColor: colors.background,
+                    },
+                }}
+            >
                 {user ? (
                     <Stack.Screen name="MainTabs" component={MainTabs} />
                 ) : (
                     <Stack.Screen name="Login" component={LoginScreen} />
                 )}
+                <Stack.Screen
+                    name="HelpArticle"
+                    component={HelpArticleScreen}
+                    options={{
+                        headerShown: true,
+                        headerTitle: 'Panduan Halaman',
+                        animation: 'slide_from_right',
+                        contentStyle: {
+                            backgroundColor: colors.background,
+                        },
+                    }}
+                />
             </Stack.Navigator>
         </NavigationContainer>
     );

@@ -30,6 +30,7 @@ export class CriteriaService {
             dataType: doc.data().dataType,
             impactType: doc.data().impactType,
             weight: doc.data().weight ?? 0,
+            isWeightLocked: !!doc.data().isWeightLocked,
             createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         }));
     }
@@ -50,6 +51,7 @@ export class CriteriaService {
                     dataType: doc.data().dataType,
                     impactType: doc.data().impactType,
                     weight: doc.data().weight ?? 0,
+                    isWeightLocked: !!doc.data().isWeightLocked,
                     createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
                 }))
                 .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -77,6 +79,7 @@ export class CriteriaService {
             dataType: docSnap.data().dataType,
             impactType: docSnap.data().impactType,
             weight: docSnap.data().weight ?? 0,
+            isWeightLocked: !!docSnap.data().isWeightLocked,
             createdAt: docSnap.data().createdAt?.toDate().toISOString() || new Date().toISOString(),
         };
     }
@@ -87,7 +90,8 @@ export class CriteriaService {
         name: string,
         dataType: DataType,
         impactType: ImpactType,
-        weight: number
+        weight: number,
+        isWeightLocked: boolean = false
     ): Promise<string> {
         const docRef = await addDoc(this.getCollectionRef(userId), {
             groupId,
@@ -95,6 +99,7 @@ export class CriteriaService {
             dataType,
             impactType,
             weight,
+            isWeightLocked,
             createdAt: Timestamp.now(),
         });
 
@@ -121,6 +126,15 @@ export class CriteriaService {
     static async updateWeight(userId: string, id: string, weight: number): Promise<void> {
         const docRef = doc(this.getCollectionRef(userId), id);
         await updateDoc(docRef, { weight });
+    }
+
+    static async updateWeightLock(
+        userId: string,
+        id: string,
+        isWeightLocked: boolean
+    ): Promise<void> {
+        const docRef = doc(this.getCollectionRef(userId), id);
+        await updateDoc(docRef, { isWeightLocked });
     }
 
     static async delete(userId: string, id: string): Promise<void> {

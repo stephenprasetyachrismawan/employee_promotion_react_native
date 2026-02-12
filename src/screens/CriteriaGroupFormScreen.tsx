@@ -10,6 +10,9 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../styles/theme';
 import { Button } from '../components/common/Button';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { SectionDisclosure } from '../components/common/SectionDisclosure';
+import { MotionView } from '../components/common/MotionView';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -78,29 +81,41 @@ export default function CriteriaGroupFormScreen({ route, navigation }: any) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                <Text style={styles.sectionTitle}>Group Name</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="e.g. Leadership Track"
-                    placeholderTextColor={colors.textTertiary}
-                    value={name}
-                    onChangeText={setName}
-                />
+            <MotionView style={styles.motionContainer}>
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                >
+                    <Text style={styles.sectionTitle}>Group Name</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g. Leadership Track"
+                        placeholderTextColor={colors.textTertiary}
+                        value={name}
+                        onChangeText={setName}
+                    />
 
-                <Text style={styles.sectionTitle}>Description (optional)</Text>
-                <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Add a short description"
-                    placeholderTextColor={colors.textTertiary}
-                    value={description}
-                    onChangeText={setDescription}
-                    multiline
-                />
+                    <SectionDisclosure
+                        title="Description"
+                        subtitle="Opsional. Bisa diisi nanti."
+                        iconName="align-left"
+                        containerStyle={styles.descriptionSection}
+                    >
+                        <TextInput
+                            style={[styles.input, styles.textArea]}
+                            placeholder="Add a short description"
+                            placeholderTextColor={colors.textTertiary}
+                            value={description}
+                            onChangeText={setDescription}
+                            multiline
+                        />
+                    </SectionDisclosure>
+                </ScrollView>
+            </MotionView>
 
-            </ScrollView>
-
-            <View style={styles.footer}>
+            <BottomActionBar>
                 <Button
                     title={isEditMode ? 'Update Group' : 'Add Group'}
                     onPress={handleSave}
@@ -112,7 +127,7 @@ export default function CriteriaGroupFormScreen({ route, navigation }: any) {
                     onPress={() => navigation.goBack()}
                     variant="outline"
                 />
-            </View>
+            </BottomActionBar>
         </SafeAreaView>
     );
 }
@@ -127,6 +142,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
+    motionContainer: {
+        flex: 1,
+    },
+
     content: {
         padding: spacing.lg,
     },
@@ -136,6 +155,10 @@ const styles = StyleSheet.create({
         fontWeight: typography.semibold,
         color: colors.textPrimary,
         marginBottom: spacing.sm,
+        marginTop: spacing.md,
+    },
+
+    descriptionSection: {
         marginTop: spacing.md,
     },
 
@@ -153,14 +176,6 @@ const styles = StyleSheet.create({
     textArea: {
         minHeight: 120,
         textAlignVertical: 'top',
-    },
-
-    footer: {
-        padding: spacing.lg,
-        gap: spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        backgroundColor: colors.surface,
     },
 
     saveButton: {

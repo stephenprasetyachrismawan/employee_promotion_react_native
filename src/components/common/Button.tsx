@@ -52,6 +52,7 @@ export const Button: React.FC<ButtonProps> = ({
             onPress={onPress}
             disabled={disabled || loading}
             activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
             {loading ? (
                 <ActivityIndicator
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 48,
+        minHeight: 52,
     },
 
     primaryButton: {

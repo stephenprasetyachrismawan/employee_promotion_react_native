@@ -12,6 +12,9 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { colors, typography, spacing, borderRadius } from '../styles/theme';
 import { Button } from '../components/common/Button';
+import { BottomActionBar } from '../components/common/BottomActionBar';
+import { SectionDisclosure } from '../components/common/SectionDisclosure';
+import { MotionView } from '../components/common/MotionView';
 import { CriteriaGroup, DecisionMethod } from '../types';
 import { CriteriaGroupService } from '../database/services/CriteriaGroupService';
 import { useAuth } from '../contexts/AuthContext';
@@ -114,103 +117,123 @@ export default function InputGroupFormScreen({ route, navigation }: any) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                <Text style={styles.sectionTitle}>Group Name</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="e.g. Batch Promosi Q4"
-                    placeholderTextColor={colors.textTertiary}
-                    value={name}
-                    onChangeText={setName}
-                />
+            <MotionView style={styles.motionContainer}>
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                >
+                    <Text style={styles.sectionTitle}>Group Name</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g. Batch Promosi Q4"
+                        placeholderTextColor={colors.textTertiary}
+                        value={name}
+                        onChangeText={setName}
+                    />
 
-                <Text style={styles.sectionTitle}>Description (optional)</Text>
-                <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Add a short description"
-                    placeholderTextColor={colors.textTertiary}
-                    value={description}
-                    onChangeText={setDescription}
-                    multiline
-                />
-
-                <Text style={styles.sectionTitle}>Pilih Kriteria</Text>
-                <Text style={styles.sectionSubtitle}>
-                    Kriteria akan dikunci setelah grup disimpan.
-                </Text>
-                <View style={styles.pickerWrapper}>
-                    <Picker
-                        selectedValue={templateGroupId}
-                        onValueChange={(value) => setTemplateGroupId(value)}
-                        enabled={!isEditMode}
-                        style={styles.picker}
+                    <SectionDisclosure
+                        title="Description"
+                        subtitle="Opsional. Boleh dikosongkan."
+                        iconName="align-left"
+                        containerStyle={styles.disclosureSection}
                     >
-                        {templates.length === 0 ? (
-                            <Picker.Item label="Belum ada kriteria" value="" />
-                        ) : (
-                            templates.map((template) => (
-                                <Picker.Item
-                                    key={template.id}
-                                    label={template.name}
-                                    value={template.id}
-                                />
-                            ))
-                        )}
-                    </Picker>
-                </View>
-                {isEditMode && selectedTemplate ? (
-                    <Text style={styles.lockedHint}>
-                        Menggunakan kriteria: {selectedTemplate.name}
-                    </Text>
-                ) : null}
+                        <TextInput
+                            style={[styles.input, styles.textArea]}
+                            placeholder="Add a short description"
+                            placeholderTextColor={colors.textTertiary}
+                            value={description}
+                            onChangeText={setDescription}
+                            multiline
+                        />
+                    </SectionDisclosure>
 
-                <Text style={styles.sectionTitle}>Metode Perhitungan</Text>
-                <Text style={styles.sectionSubtitle}>
-                    Metode dapat diubah setelah grup disimpan.
-                </Text>
-                <View style={styles.methodOptions}>
-                    <TouchableOpacity
-                        style={[
-                            styles.methodOption,
-                            method === 'WPM' && styles.methodOptionActive,
-                        ]}
-                        onPress={() => setMethod('WPM')}
+                    <SectionDisclosure
+                        title="Pilih Kriteria"
+                        subtitle="Kriteria akan dikunci setelah grup disimpan."
+                        iconName="list"
+                        containerStyle={styles.disclosureSection}
+                        defaultExpanded
                     >
-                        <Text
-                            style={[
-                                styles.methodOptionText,
-                                method === 'WPM' && styles.methodOptionTextActive,
-                            ]}
-                        >
-                            Weighted Product (WPM)
-                        </Text>
-                        <Text style={styles.methodHint}>
-                            Perkalian berbobot, nilai harus &gt; 0
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[
-                            styles.methodOption,
-                            method === 'SAW' && styles.methodOptionActive,
-                        ]}
-                        onPress={() => setMethod('SAW')}
-                    >
-                        <Text
-                            style={[
-                                styles.methodOptionText,
-                                method === 'SAW' && styles.methodOptionTextActive,
-                            ]}
-                        >
-                            SAW (Simple Additive Weighting)
-                        </Text>
-                        <Text style={styles.methodHint}>
-                            Normalisasi &amp; penjumlahan berbobot
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
+                        <View style={styles.pickerWrapper}>
+                            <Picker
+                                selectedValue={templateGroupId}
+                                onValueChange={(value) => setTemplateGroupId(value)}
+                                enabled={!isEditMode}
+                                style={styles.picker}
+                            >
+                                {templates.length === 0 ? (
+                                    <Picker.Item label="Belum ada kriteria" value="" />
+                                ) : (
+                                    templates.map((template) => (
+                                        <Picker.Item
+                                            key={template.id}
+                                            label={template.name}
+                                            value={template.id}
+                                        />
+                                    ))
+                                )}
+                            </Picker>
+                        </View>
+                        {isEditMode && selectedTemplate ? (
+                            <Text style={styles.lockedHint}>
+                                Menggunakan kriteria: {selectedTemplate.name}
+                            </Text>
+                        ) : null}
+                    </SectionDisclosure>
 
-            <View style={styles.footer}>
+                    <SectionDisclosure
+                        title="Metode Perhitungan"
+                        subtitle="Metode dapat diubah setelah grup disimpan."
+                        iconName="calculator"
+                        containerStyle={styles.disclosureSection}
+                    >
+                        <View style={styles.methodOptions}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.methodOption,
+                                    method === 'WPM' && styles.methodOptionActive,
+                                ]}
+                                onPress={() => setMethod('WPM')}
+                            >
+                                <Text
+                                    style={[
+                                        styles.methodOptionText,
+                                        method === 'WPM' && styles.methodOptionTextActive,
+                                    ]}
+                                >
+                                    Weighted Product (WPM)
+                                </Text>
+                                <Text style={styles.methodHint}>
+                                    Perkalian berbobot, nilai harus &gt; 0
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.methodOption,
+                                    method === 'SAW' && styles.methodOptionActive,
+                                ]}
+                                onPress={() => setMethod('SAW')}
+                            >
+                                <Text
+                                    style={[
+                                        styles.methodOptionText,
+                                        method === 'SAW' && styles.methodOptionTextActive,
+                                    ]}
+                                >
+                                    SAW (Simple Additive Weighting)
+                                </Text>
+                                <Text style={styles.methodHint}>
+                                    Normalisasi &amp; penjumlahan berbobot
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </SectionDisclosure>
+                </ScrollView>
+            </MotionView>
+
+            <BottomActionBar>
                 <Button
                     title={isEditMode ? 'Update Group' : 'Add Group'}
                     onPress={handleSave}
@@ -222,7 +245,7 @@ export default function InputGroupFormScreen({ route, navigation }: any) {
                     onPress={() => navigation.goBack()}
                     variant="outline"
                 />
-            </View>
+            </BottomActionBar>
         </SafeAreaView>
     );
 }
@@ -234,6 +257,10 @@ const styles = StyleSheet.create({
     },
 
     scrollView: {
+        flex: 1,
+    },
+
+    motionContainer: {
         flex: 1,
     },
 
@@ -249,12 +276,6 @@ const styles = StyleSheet.create({
         marginTop: spacing.md,
     },
 
-    sectionSubtitle: {
-        fontSize: typography.sm,
-        color: colors.textSecondary,
-        marginBottom: spacing.md,
-    },
-
     input: {
         backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
@@ -263,6 +284,10 @@ const styles = StyleSheet.create({
         color: colors.textPrimary,
         borderWidth: 1,
         borderColor: colors.border,
+    },
+
+    disclosureSection: {
+        marginTop: spacing.md,
     },
 
     textArea: {
@@ -319,14 +344,6 @@ const styles = StyleSheet.create({
     methodHint: {
         fontSize: typography.sm,
         color: colors.textSecondary,
-    },
-
-    footer: {
-        padding: spacing.lg,
-        gap: spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        backgroundColor: colors.surface,
     },
 
     saveButton: {
