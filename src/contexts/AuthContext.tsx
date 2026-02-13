@@ -1,11 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import {
-    User,
-    signInWithPopup,
-    signOut as firebaseSignOut,
-    onAuthStateChanged,
-} from 'firebase/auth';
-import { auth, googleProvider } from '../config/firebase';
+import { User, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
+import { auth, firebaseInitError } from '../config/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AuthContextType {
@@ -29,6 +24,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!auth) {
+            console.warn(firebaseInitError ?? 'Firebase Auth belum siap.');
+            setLoading(false);
+            return;
+        }
+
         // Listen for auth state changes
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setUser(user);
@@ -47,7 +48,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signInWithGoogle = async () => {
         try {
-            await signInWithPopup(auth, googleProvider);
+            if (!auth) {
+                throw new Error(firebaseInitError ?? 'Firebase Auth belum siap.');
+            }
+
+            throw new Error(
+                'Login Google native belum diimplementasikan. Gunakan Expo Auth Session + signInWithCredential.'
+            );
         } catch (error) {
             console.error('Error signing in with Google:', error);
             throw error;
@@ -56,6 +63,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signOut = async () => {
         try {
+            if (!auth) {
+                return;
+            }
+
             await firebaseSignOut(auth);
             await AsyncStorage.removeItem('userId');
         } catch (error) {
