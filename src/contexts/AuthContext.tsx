@@ -27,10 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Use Expo's auth proxy for easier setup (already whitelisted by Google)
-    const redirectUri = AuthSession.makeRedirectUri({
-        useProxy: true,
-    });
+    const redirectUri = AuthSession.makeRedirectUri();
 
     console.log('Redirect URI:', redirectUri);
 
@@ -86,14 +83,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const result = await request.promptAsync(discovery);
 
             if (result.type === 'success') {
-                const { id_token } = result.params;
+                const { id_token, access_token } = result.params;
 
-                if (!id_token) {
-                    throw new Error('ID token tidak ditemukan dalam response');
+                if (!id_token && !access_token) {
+                    throw new Error('Token Google tidak ditemukan dalam response');
                 }
 
-                // Create credential with Google ID token
-                const credential = GoogleAuthProvider.credential(id_token);
+                // Firebase accepts ID token and/or access token for Google credential.
+                // On some web flows, Google only returns access_token.
+                const credential = GoogleAuthProvider.credential(id_token ?? null, access_token);
 
                 // Sign in to Firebase with credential
                 await signInWithCredential(auth, credential);
