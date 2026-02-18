@@ -165,16 +165,6 @@ export default function CriteriaListScreen({ navigation }: any) {
                             <View style={styles.groupInfo}>
                                 <View style={styles.groupTitleRow}>
                                     <Text style={styles.groupName}>{item.name}</Text>
-                                    <View
-                                        style={[
-                                            styles.methodBadge,
-                                            item.method === 'SAW'
-                                                ? styles.methodBadgeSaw
-                                                : styles.methodBadgeWpm,
-                                        ]}
-                                    >
-                                        <Text style={styles.methodBadgeText}>{item.method}</Text>
-                                    </View>
                                 </View>
                             </View>
                         </View>
@@ -333,26 +323,6 @@ const styles = StyleSheet.create({
 
     groupName: {
         fontSize: typography.base,
-        fontWeight: typography.semibold,
-        color: colors.textPrimary,
-    },
-
-    methodBadge: {
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        borderRadius: borderRadius.full,
-    },
-
-    methodBadgeSaw: {
-        backgroundColor: colors.primary + '20',
-    },
-
-    methodBadgeWpm: {
-        backgroundColor: colors.benefit + '20',
-    },
-
-    methodBadgeText: {
-        fontSize: typography.xs,
         fontWeight: typography.semibold,
         color: colors.textPrimary,
     },
