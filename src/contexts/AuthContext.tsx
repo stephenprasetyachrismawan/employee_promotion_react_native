@@ -2,8 +2,9 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { User, signOut as firebaseSignOut, onAuthStateChanged, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
 import { auth, firebaseInitError } from '../config/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as AuthSession from 'expo-auth-session';
+import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -26,10 +27,15 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-
-    const redirectUri = AuthSession.makeRedirectUri();
-
-    console.log('Redirect URI:', redirectUri);
+    const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
+    const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
+    const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        androidClientId,
+        iosClientId,
+        webClientId,
+        scopes: ['openid', 'profile', 'email'],
+    });
 
     useEffect(() => {
         if (!auth) {
@@ -54,51 +60,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return unsubscribe;
     }, []);
 
+    useEffect(() => {
+        const finalizeGoogleSignIn = async () => {
+            if (!auth || response?.type !== 'success') {
+                return;
+            }
+
+            const idToken = response.authentication?.idToken ?? response.params?.id_token;
+            const accessToken = response.authentication?.accessToken ?? response.params?.access_token;
+
+            if (!idToken && !accessToken) {
+                throw new Error('Token Google tidak ditemukan');
+            }
+
+            const credential = GoogleAuthProvider.credential(idToken ?? null, accessToken);
+            await signInWithCredential(auth, credential);
+        };
+
+        finalizeGoogleSignIn().catch((error) => {
+            console.error('Google sign-in finalize error:', error);
+        });
+    }, [response]);
+
     const signInWithGoogle = async () => {
         try {
             if (!auth) {
                 throw new Error(firebaseInitError ?? 'Firebase Auth belum siap.');
             }
 
-            const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
-            if (!clientId) {
-                throw new Error('Google Client ID belum dikonfigurasi di .env');
-            }
-
-            // Configure Google OAuth
-            const discovery = {
-                authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-                tokenEndpoint: 'https://oauth2.googleapis.com/token',
-            };
-
-            // Create authorization request
-            const request = new AuthSession.AuthRequest({
-                clientId,
-                redirectUri,
-                scopes: ['openid', 'profile', 'email'],
-                responseType: AuthSession.ResponseType.Token,
-                usePKCE: false,
+            const activeClientId = Platform.select({
+                android: androidClientId,
+                ios: iosClientId,
+                default: webClientId,
             });
 
-            const result = await request.promptAsync(discovery);
+            if (!activeClientId) {
+                const requiredEnv = Platform.select({
+                    android: 'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID',
+                    ios: 'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID',
+                    default: 'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+                });
+                throw new Error(`${requiredEnv} belum dikonfigurasi di .env`);
+            }
 
-            if (result.type === 'success') {
-                const { id_token, access_token } = result.params;
+            if (!request) {
+                throw new Error('Google auth request belum siap. Coba lagi.');
+            }
 
-                if (!id_token && !access_token) {
-                    throw new Error('Token Google tidak ditemukan dalam response');
-                }
-
-                // Firebase accepts ID token and/or access token for Google credential.
-                // On some web flows, Google only returns access_token.
-                const credential = GoogleAuthProvider.credential(id_token ?? null, access_token);
-
-                // Sign in to Firebase with credential
-                await signInWithCredential(auth, credential);
-            } else if (result.type === 'cancel') {
+            const result = await promptAsync();
+            if (result.type === 'cancel' || result.type === 'dismiss') {
                 console.log('User cancelled the login');
-            } else {
-                throw new Error('Login failed');
+                return;
+            }
+
+            if (result.type === 'error') {
+                throw new Error(result.error?.message ?? 'Login Google gagal');
             }
         } catch (error) {
             console.error('Error signing in with Google:', error);
