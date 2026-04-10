@@ -188,6 +188,16 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
     };
 
     const isReadOnly = group?.groupType === 'input' && !!group.sourceGroupId;
+    const canUseAHPWeighting = group?.groupType === 'criteria' && !isReadOnly;
+
+    const handleOpenAHPWeighting = () => {
+        if (criteria.length < 2) {
+            showAlert('AHP Weighting', 'Tambahkan minimal dua criterion sebelum memakai AHP.');
+            return;
+        }
+
+        navigation.navigate('AHPWeighting', { groupId });
+    };
 
     const renderCriterion = ({ item }: { item: Criterion }) => {
         const isBenefit = item.impactType === 'BENEFIT';
@@ -304,9 +314,19 @@ export default function CriteriaGroupDetailScreen({ route, navigation }: any) {
                 <View style={styles.totalHeader}>
                     <Text style={styles.totalLabel}>Total Weight</Text>
                     {!isReadOnly ? (
-                        <TouchableOpacity style={styles.autoButton} onPress={handleAutoDistribute}>
-                            <Text style={styles.autoButtonText}>Set Auto</Text>
-                        </TouchableOpacity>
+                        <View style={styles.totalActions}>
+                            {canUseAHPWeighting ? (
+                                <TouchableOpacity
+                                    style={styles.ahpButton}
+                                    onPress={handleOpenAHPWeighting}
+                                >
+                                    <Text style={styles.ahpButtonText}>Set Weight via AHP</Text>
+                                </TouchableOpacity>
+                            ) : null}
+                            <TouchableOpacity style={styles.autoButton} onPress={handleAutoDistribute}>
+                                <Text style={styles.autoButtonText}>Set Auto</Text>
+                            </TouchableOpacity>
+                        </View>
                     ) : null}
                 </View>
                 <Text style={[styles.totalValue, isWeightValid && styles.totalValueValid]}>
@@ -431,6 +451,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        gap: spacing.md,
+    },
+
+    totalActions: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'flex-end',
+        gap: spacing.sm,
     },
 
     autoButton: {
@@ -444,6 +472,19 @@ const styles = StyleSheet.create({
         fontSize: typography.sm,
         fontWeight: typography.semibold,
         color: colors.primary,
+    },
+
+    ahpButton: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        backgroundColor: colors.success + '15',
+        borderRadius: borderRadius.md,
+    },
+
+    ahpButtonText: {
+        fontSize: typography.sm,
+        fontWeight: typography.semibold,
+        color: colors.success,
     },
 
     totalValue: {

@@ -9,7 +9,11 @@ export type HelpTopic =
     | 'input_group_form'
     | 'manual_entry'
     | 'excel_upload'
-    | 'results';
+    | 'results'
+    | 'ahp_weighting'
+    | 'ahp_project_list'
+    | 'ahp_pairwise'
+    | 'ahp_results';
 
 interface HelpSection {
     title: string;
@@ -379,6 +383,93 @@ export const helpArticles: Record<HelpTopic, HelpArticle> = {
                 paragraphs: [
                     'Ranking adalah alat bantu pengambilan keputusan, bukan satu-satunya keputusan final.',
                     'Kombinasikan hasil kuantitatif dengan pertimbangan kualitatif (rekam jejak, potensi, dan kebutuhan organisasi).',
+                ],
+            },
+        ],
+    },
+    ahp_weighting: {
+        title: 'Panduan AHP Weighting',
+        subtitle:
+            'Pembobotan criteria dengan pairwise comparison dan consistency ratio sebelum bobot diterapkan ke criteria group.',
+        sections: [
+            {
+                title: 'Tujuan',
+                paragraphs: [
+                    'AHP Weighting membantu menentukan bobot criteria secara konsisten berdasarkan perbandingan berpasangan.',
+                    'Saat bobot diterapkan, nilai weight pada criteria group aktif akan diperbarui dan dipakai kembali oleh WPM atau SAW.',
+                ],
+            },
+            {
+                title: 'Langkah Penggunaan',
+                paragraphs: [
+                    'Isi matrix pairwise pada area kanan atas. Nilai reciprocal pada area kiri bawah dihitung otomatis.',
+                    'Lanjutkan ke step calculation dan consistency untuk membaca priority vector, CI, RI, dan CR.',
+                ],
+                bullets: [
+                    'CR di bawah 0.1 dianggap konsisten.',
+                    'Jika CR tidak konsisten, revisi nilai pairwise sebelum apply.',
+                    'Gunakan Simpan Tanpa Apply jika ingin menyimpan session sebagai riwayat.',
+                ],
+            },
+        ],
+    },
+    ahp_project_list: {
+        title: 'Panduan AHP Projects',
+        subtitle:
+            'Daftar project AHP full hierarchy yang terpisah dari pipeline WPM dan SAW.',
+        sections: [
+            {
+                title: 'Struktur Project',
+                paragraphs: [
+                    'Setiap project memiliki goal, criteria, optional sub-criteria, alternatives, matrix pairwise, dan hasil ranking global.',
+                    'Gunakan project terpisah untuk skenario keputusan yang berbeda agar riwayat evaluasi tetap jelas.',
+                ],
+            },
+            {
+                title: 'Interaksi',
+                paragraphs: [
+                    'Buat project baru dari tombol bawah. Swipe kartu project untuk open, copy, atau delete.',
+                ],
+            },
+        ],
+    },
+    ahp_pairwise: {
+        title: 'Panduan Pairwise AHP',
+        subtitle:
+            'Pengisian matrix perbandingan untuk criteria, sub-criteria, dan alternatives.',
+        sections: [
+            {
+                title: 'Skala AHP',
+                paragraphs: [
+                    'Gunakan nilai 1 saat dua item sama penting. Gunakan 3, 5, 7, atau 9 saat item baris lebih penting dari item kolom dengan intensitas yang meningkat.',
+                    'Nilai pecahan seperti 1/3 atau 1/5 menyatakan kebalikannya.',
+                ],
+            },
+            {
+                title: 'Konsistensi',
+                paragraphs: [
+                    'Setiap matrix menyimpan priority vector dan consistency ratio. CR di bawah 0.1 menjadi indikator bahwa perbandingan cukup konsisten.',
+                ],
+            },
+        ],
+    },
+    ahp_results: {
+        title: 'Panduan AHP Results',
+        subtitle:
+            'Ranking global alternatives dari bobot criteria dan local priority alternatives.',
+        sections: [
+            {
+                title: 'Cara Membaca',
+                paragraphs: [
+                    'Global score dihitung dari penjumlahan kontribusi bobot criteria terhadap local priority alternative.',
+                    'Ranking tertinggi adalah alternative dengan global score terbesar.',
+                ],
+            },
+            {
+                title: 'Validasi',
+                paragraphs: [
+                    'Pastikan matrix criteria dan matrix alternative per target sudah tersimpan sebelum menghitung ranking.',
+                    'Gunakan consistency summary untuk melihat matrix yang perlu direvisi.',
                 ],
             },
         ],

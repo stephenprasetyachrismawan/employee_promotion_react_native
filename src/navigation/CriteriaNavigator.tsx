@@ -4,6 +4,7 @@ import CriteriaListScreen from '../screens/CriteriaListScreen';
 import CriterionFormScreen from '../screens/CriterionFormScreen';
 import CriteriaGroupFormScreen from '../screens/CriteriaGroupFormScreen';
 import CriteriaGroupDetailScreen from '../screens/CriteriaGroupDetailScreen';
+import AHPWeightingScreen from '../screens/ahp/AHPWeightingScreen';
 import { colors } from '../styles/theme';
 import { HelpIconButton } from '../components/common/HelpIconButton';
 
@@ -72,6 +73,11 @@ export default function CriteriaNavigator() {
                         backgroundColor: colors.background + 'F2',
                     },
                 })}
+            />
+            <Stack.Screen
+                name="AHPWeighting"
+                component={AHPWeightingScreen}
+                options={{ headerShown: false }}
             />
         </Stack.Navigator>
     );

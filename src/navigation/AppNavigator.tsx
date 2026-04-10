@@ -15,6 +15,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CriteriaNavigator from './CriteriaNavigator';
 import InputDataNavigator from './InputDataNavigator';
+import AHPNavigator from './AHPNavigator';
 import ResultsScreen from '../screens/ResultsScreen';
 import HelpArticleScreen from '../screens/HelpArticleScreen';
 
@@ -36,6 +37,8 @@ function MainTabs() {
                         iconName = 'list';
                     } else if (route.name === 'Input') {
                         iconName = 'edit';
+                    } else if (route.name === 'AHP') {
+                        iconName = 'project-diagram';
                     } else if (route.name === 'Results') {
                         iconName = 'trophy';
                     }
@@ -66,6 +69,7 @@ function MainTabs() {
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Criteria" component={CriteriaNavigator} />
             <Tab.Screen name="Input" component={InputDataNavigator} />
+            <Tab.Screen name="AHP" component={AHPNavigator} />
             <Tab.Screen name="Results" component={ResultsScreen} />
         </Tab.Navigator>
     );

@@ -56,3 +56,91 @@ export interface DecisionResult {
     rank: number;
     values: Record<string, number>;
 }
+
+export interface AHPMatrixAnalysis {
+    normalizedMatrix: number[][];
+    columnSums: number[];
+    priorityVector: number[];
+    weightedSumVector: number[];
+    consistencyVector: number[];
+    lambdaMax: number;
+    ci: number;
+    ri: number;
+    cr: number;
+    isConsistent: boolean;
+}
+
+export interface AHPWeightingSession extends AHPMatrixAnalysis {
+    id: string;
+    groupId: string;
+    criteriaIds: string[];
+    criteriaNames: string[];
+    pairwiseMatrix: number[][];
+    appliedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AHPProject {
+    id: string;
+    name: string;
+    goal: string;
+    status: 'draft' | 'complete';
+    hasSub: boolean;
+    currentStep: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AHPCriterion {
+    id: string;
+    projectId: string;
+    name: string;
+    order: number;
+    weight: number;
+    createdAt: string;
+}
+
+export interface AHPSubCriterion {
+    id: string;
+    projectId: string;
+    criterionId: string;
+    name: string;
+    order: number;
+    localWeight: number;
+    globalWeight: number;
+    createdAt: string;
+}
+
+export interface AHPAlternative {
+    id: string;
+    projectId: string;
+    name: string;
+    order: number;
+    createdAt: string;
+}
+
+export type AHPMatrixLevel =
+    | 'criteria'
+    | 'sub_criteria'
+    | 'alternative_per_criterion'
+    | 'alternative_per_sub';
+
+export interface AHPMatrix extends AHPMatrixAnalysis {
+    id: string;
+    projectId: string;
+    level: AHPMatrixLevel;
+    parentId: string | null;
+    criteriaIds: string[];
+    alternativeIds: string[];
+    matrix: number[][];
+    updatedAt: string;
+}
+
+export interface AHPGlobalResult {
+    alternativeId: string;
+    alternativeName: string;
+    globalScore: number;
+    rank: number;
+    scorePerCriteria: Record<string, number>;
+}
