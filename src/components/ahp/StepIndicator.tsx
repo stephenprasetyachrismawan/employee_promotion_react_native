@@ -2,6 +2,9 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { borderRadius, colors, spacing, typography } from '../../styles/theme';
 
+const STEP_INDICATOR_VERTICAL_PADDING = spacing.md / 4;
+const STEP_INDICATOR_HEIGHT = 44;
+
 interface StepIndicatorProps {
     steps: string[];
     currentStep: number;
@@ -11,6 +14,7 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, currentStep
     <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.scrollView}
         contentContainerStyle={styles.container}
     >
         {steps.map((step, index) => {
@@ -44,9 +48,15 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, currentStep
 );
 
 const styles = StyleSheet.create({
+    scrollView: {
+        flexGrow: 0,
+        height: STEP_INDICATOR_HEIGHT,
+        maxHeight: STEP_INDICATOR_HEIGHT,
+    },
+
     container: {
         paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
+        paddingVertical: STEP_INDICATOR_VERTICAL_PADDING,
         gap: spacing.md,
         alignItems: 'center',
     },

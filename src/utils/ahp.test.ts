@@ -2,6 +2,8 @@ import {
     analyzeAHPMatrix,
     computeGlobalPriorities,
     createDefaultMatrix,
+    deserializeAHPMatrix,
+    serializeAHPMatrix,
     setReciprocal,
 } from './ahp';
 
@@ -28,6 +30,16 @@ const updatedMatrix = setReciprocal(defaultMatrix, 0, 2, 5);
 assertClose(updatedMatrix[0][2], 5);
 assertClose(updatedMatrix[2][0], 0.2);
 assertClose(defaultMatrix[0][2], 1);
+
+const serializedMatrix = serializeAHPMatrix([
+    [1, 3],
+    [1 / 3, 1],
+]);
+if (serializedMatrix.some((row) => Object.values(row).some((value) => Array.isArray(value)))) {
+    throw new Error('serializeAHPMatrix should not create nested arrays for Firestore');
+}
+assertArrayClose(deserializeAHPMatrix(serializedMatrix)[0], [1, 3], 0.0001);
+assertArrayClose(deserializeAHPMatrix(serializedMatrix)[1], [1 / 3, 1], 0.0001);
 
 const analysis = analyzeAHPMatrix([
     [1, 3, 5],

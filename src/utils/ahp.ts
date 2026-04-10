@@ -1,5 +1,7 @@
 import { AHPMatrixAnalysis } from '../types';
 
+export type SerializedAHPMatrixRow = Record<string, number>;
+
 export const RI_TABLE: Record<number, number> = {
     1: 0,
     2: 0,
@@ -130,6 +132,36 @@ export function createDefaultMatrix(n: number): number[][] {
     }
 
     return Array.from({ length: n }, () => Array.from({ length: n }, () => 1));
+}
+
+export function serializeAHPMatrix(matrix: number[][]): SerializedAHPMatrixRow[] {
+    validateMatrix(matrix);
+    return matrix.map((row) =>
+        row.reduce<SerializedAHPMatrixRow>((serializedRow, value, columnIndex) => {
+            serializedRow[`c${columnIndex}`] = value;
+            return serializedRow;
+        }, {})
+    );
+}
+
+export function deserializeAHPMatrix(value: unknown): number[][] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    if (value.every((row) => Array.isArray(row))) {
+        return value as number[][];
+    }
+
+    return value.map((row) => {
+        if (!row || typeof row !== 'object' || Array.isArray(row)) {
+            return [];
+        }
+
+        return Object.entries(row as SerializedAHPMatrixRow)
+            .sort(([leftKey], [rightKey]) => Number(leftKey.slice(1)) - Number(rightKey.slice(1)))
+            .map(([, cellValue]) => cellValue);
+    });
 }
 
 export function setReciprocal(

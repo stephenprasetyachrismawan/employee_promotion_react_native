@@ -23,7 +23,13 @@ import {
     AHPSubCriterion,
     AHPWeightingSession,
 } from '../../types';
-import { analyzeAHPMatrix, computeGlobalPriorities, createDefaultMatrix } from '../../utils/ahp';
+import {
+    analyzeAHPMatrix,
+    computeGlobalPriorities,
+    createDefaultMatrix,
+    deserializeAHPMatrix,
+    serializeAHPMatrix,
+} from '../../utils/ahp';
 
 interface MatrixSaveData {
     id?: string;
@@ -161,8 +167,8 @@ export class AHPService {
             groupId: data.groupId ?? '',
             criteriaIds: data.criteriaIds ?? [],
             criteriaNames: data.criteriaNames ?? [],
-            pairwiseMatrix: data.pairwiseMatrix ?? [],
-            normalizedMatrix: data.normalizedMatrix ?? [],
+            pairwiseMatrix: deserializeAHPMatrix(data.pairwiseMatrix),
+            normalizedMatrix: deserializeAHPMatrix(data.normalizedMatrix),
             columnSums: data.columnSums ?? [],
             priorityVector: data.priorityVector ?? [],
             weightedSumVector: data.weightedSumVector ?? [],
@@ -233,8 +239,8 @@ export class AHPService {
             parentId: data.parentId ?? null,
             criteriaIds: data.criteriaIds ?? [],
             alternativeIds: data.alternativeIds ?? [],
-            matrix: data.matrix ?? [],
-            normalizedMatrix: data.normalizedMatrix ?? [],
+            matrix: deserializeAHPMatrix(data.matrix),
+            normalizedMatrix: deserializeAHPMatrix(data.normalizedMatrix),
             columnSums: data.columnSums ?? [],
             priorityVector: data.priorityVector ?? [],
             weightedSumVector: data.weightedSumVector ?? [],
@@ -261,8 +267,9 @@ export class AHPService {
             groupId,
             criteriaIds,
             criteriaNames,
-            pairwiseMatrix,
             ...analysis,
+            pairwiseMatrix: serializeAHPMatrix(pairwiseMatrix),
+            normalizedMatrix: serializeAHPMatrix(analysis.normalizedMatrix),
             appliedAt: null,
             createdAt: now,
             updatedAt: now,
@@ -291,8 +298,9 @@ export class AHPService {
     ) {
         const analysis = analyzeAHPMatrix(matrix);
         await updateDoc(doc(this.getWeightingSessionsRef(userId), sessionId), {
-            pairwiseMatrix: matrix,
             ...analysis,
+            pairwiseMatrix: serializeAHPMatrix(matrix),
+            normalizedMatrix: serializeAHPMatrix(analysis.normalizedMatrix),
             updatedAt: Timestamp.now(),
         });
 
@@ -549,8 +557,9 @@ export class AHPService {
             parentId: matrixData.parentId ?? null,
             criteriaIds: matrixData.criteriaIds ?? [],
             alternativeIds: matrixData.alternativeIds ?? [],
-            matrix: matrixData.matrix,
             ...analysis,
+            matrix: serializeAHPMatrix(matrixData.matrix),
+            normalizedMatrix: serializeAHPMatrix(analysis.normalizedMatrix),
             updatedAt: Timestamp.now(),
         };
 
